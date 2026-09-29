@@ -1,0 +1,8 @@
+{
+  "name": "InvoiceFlow",
+  "description": "Enterprise metadata-driven invoice ingestion, OCR, AI extraction, validation, and SAP ECC export system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

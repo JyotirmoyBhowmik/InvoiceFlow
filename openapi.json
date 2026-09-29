@@ -1,0 +1,70 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "InvoiceFlow Enterprise Engine API",
+    "description": "Metadata-driven invoice ingestion, OCR, AI extraction, validation, and SAP ECC export REST API.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": { "description": "System is healthy" }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Readiness probe",
+        "responses": {
+          "200": { "description": "System dependencies connected" }
+        }
+      }
+    },
+    "/api/v1/documents": {
+      "get": {
+        "summary": "List documents with dynamic filters and validation status",
+        "responses": {
+          "200": { "description": "List of invoices" }
+        }
+      },
+      "post": {
+        "summary": "Ingest invoice document",
+        "responses": {
+          "201": { "description": "Document created and queued for processing" }
+        }
+      }
+    },
+    "/api/v1/fields": {
+      "get": {
+        "summary": "List metadata field definitions",
+        "responses": {
+          "200": { "description": "Dynamic field list" }
+        }
+      },
+      "put": {
+        "summary": "Update dynamic field definition (renaming, validation, export map)",
+        "responses": {
+          "200": { "description": "Field updated" }
+        }
+      }
+    },
+    "/api/v1/rules/evaluate": {
+      "post": {
+        "summary": "Dry-run rule simulation against invoice payload",
+        "responses": {
+          "200": { "description": "Evaluated mutations and matched rule codes" }
+        }
+      }
+    },
+    "/api/v1/export/runs": {
+      "post": {
+        "summary": "Execute SAP ECC export run for approved invoices",
+        "responses": {
+          "200": { "description": "Generated CSV and TXT files with control totals" }
+        }
+      }
+    }
+  }
+}
