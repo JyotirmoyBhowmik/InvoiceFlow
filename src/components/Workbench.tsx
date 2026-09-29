@@ -25,6 +25,7 @@ export const Workbench: React.FC = () => {
   });
 
   const [activeHighlightField, setActiveHighlightField] = useState<string | null>(null);
+  const [selectedEvidenceField, setSelectedEvidenceField] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [rejectionModal, setRejectionModal] = useState<boolean>(false);
   const [rejectionReason, setRejectionReason] = useState<string>('');
@@ -40,9 +41,10 @@ export const Workbench: React.FC = () => {
         ...(currentDoc.fields[fieldKey] || {
           field_key: fieldKey,
           confidence: 100,
-          source: 'MANUAL',
+          value_source: 'USER_CORRECTED' as const,
         }),
         normalized_value: newValue,
+        value_source: 'USER_CORRECTED' as const,
         is_edited: true,
       },
     };
@@ -356,44 +358,94 @@ export const Workbench: React.FC = () => {
                     ? currentDoc.company_code
                     : '';
 
-                const confidence = extracted?.confidence ?? 95;
-                const isHighConf = confidence >= 90;
-                const isMidConf = confidence >= 70 && confidence < 90;
+                const confidence = extracted?.confidence ?? 0;
+                const provenance = extracted?.value_source || 'NOT_FOUND';
+                const isNotFound = provenance === 'NOT_FOUND';
+                const isExtracted = provenance === 'EXTRACTED';
+                const isDerived = provenance === 'DERIVED';
+                const isDefault = provenance === 'MASTER_DEFAULT';
+                const isCorrected = provenance === 'USER_CORRECTED';
 
                 return (
                   <div
                     key={f.id}
                     onMouseEnter={() => setActiveHighlightField(f.field_key)}
                     onMouseLeave={() => setActiveHighlightField(null)}
-                    className="p-2.5 rounded bg-neutral-900 border border-neutral-800/80 hover:border-neutral-700 transition-colors space-y-1"
+                    className={`p-2.5 rounded bg-neutral-900 border transition-colors space-y-1.5 ${
+                      selectedEvidenceField === f.field_key
+                        ? 'border-blue-500 ring-1 ring-blue-500/30'
+                        : isNotFound && f.is_mandatory
+                        ? 'border-red-800/80 bg-red-950/10'
+                        : 'border-neutral-800/80 hover:border-neutral-700'
+                    }`}
                   >
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-medium text-neutral-300 flex items-center gap-1">
-                        {f.display_label}
-                        {f.is_mandatory && <span className="text-amber-400">*</span>}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedEvidenceField(
+                              selectedEvidenceField === f.field_key ? null : f.field_key
+                            )
+                          }
+                          className="font-medium text-neutral-300 hover:text-blue-400 flex items-center gap-1 text-left"
+                          title="Click to inspect extraction evidence"
+                        >
+                          <span>{f.display_label}</span>
+                          {f.is_mandatory && <span className="text-amber-400">*</span>}
+                        </button>
+                      </div>
+
+                      {/* Provenance & Confidence Badges */}
                       <div className="flex items-center gap-1.5 font-mono text-[10px]">
-                        <span className="text-neutral-500">{f.export_column_name || '-'}</span>
                         <span
-                          className={`px-1 py-0.2 rounded font-bold ${
-                            isHighConf
-                              ? 'bg-emerald-500/10 text-emerald-400'
-                              : isMidConf
-                              ? 'bg-amber-500/10 text-amber-400'
-                              : 'bg-red-500/10 text-red-400'
+                          className={`px-1.5 py-0.2 rounded font-semibold border ${
+                            isExtracted
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : isDerived
+                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                              : isDefault
+                              ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                              : isCorrected
+                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                              : 'bg-red-500/10 text-red-400 border-red-500/30'
                           }`}
                         >
-                          {confidence}%
+                          {provenance}
                         </span>
+
+                        <span className="text-neutral-500">{confidence}%</span>
                       </div>
                     </div>
 
                     <input
                       type={f.data_type === 'NUMBER' ? 'number' : 'text'}
                       value={val}
+                      placeholder={isNotFound ? 'NOT FOUND IN DOCUMENT' : ''}
                       onChange={(e) => handleUpdateFieldValue(f.field_key, e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-800 focus:border-blue-500 rounded text-xs text-white font-mono"
+                      className={`w-full px-2.5 py-1.5 bg-neutral-950 border focus:border-blue-500 rounded text-xs text-white font-mono ${
+                        isNotFound && f.is_mandatory
+                          ? 'border-red-700/60 placeholder:text-red-500/70'
+                          : 'border-neutral-800'
+                      }`}
                     />
+
+                    {/* Extraction Evidence Drawer for Selected Field */}
+                    {selectedEvidenceField === f.field_key && (
+                      <div className="p-2.5 mt-2 bg-neutral-950 border border-blue-500/30 rounded text-[11px] font-mono text-neutral-400 space-y-1">
+                        <div className="text-blue-400 font-semibold flex justify-between">
+                          <span>Extraction Evidence: {f.field_key}</span>
+                          <span className="text-neutral-500 text-[10px]">{extracted?.extractor_name || 'OCR/AI'}</span>
+                        </div>
+                        <div>Source Type: <span className="text-white">{provenance}</span></div>
+                        <div>Page: <span className="text-white">{extracted?.source_page || 1}</span></div>
+                        <div>Confidence: <span className="text-white">{confidence}%</span></div>
+                        {extracted?.source_bounding_box && (
+                          <div>Bounding Box: <span className="text-white">x:{extracted.source_bounding_box.x}% y:{extracted.source_bounding_box.y}% w:{extracted.source_bounding_box.w}% h:{extracted.source_bounding_box.h}%</span></div>
+                        )}
+                        <div>Source Artifact: <span className="text-white truncate block">{currentDoc.document_artifact_sha256?.substring(0, 16)}...</span></div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

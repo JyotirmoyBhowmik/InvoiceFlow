@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -16,25 +16,84 @@ import { ErrorCatalogManager } from './components/ErrorCatalogManager';
 import { ThemeStudio } from './components/ThemeStudio';
 import { SystemSettings } from './components/SystemSettings';
 import { IngestModal } from './components/IngestModal';
+import { AuthModal } from './components/AuthModal';
 import { useInvoiceFlowStore } from './store/useInvoiceFlowStore';
+import { UserSession } from './types';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Authenticated user session state (default to an initial superadmin for instant accessibility, or saved in storage)
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
+    const saved = localStorage.getItem('invoiceflow_user_session');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    // Default bootstrap administrator session
+    return {
+      id: 'usr_bootstrap_superadmin',
+      username: 'superadmin',
+      email: 'admin@enterprise.internal',
+      full_name: 'Enterprise Super Administrator',
+      role: 'SUPER_ADMIN',
+      permissions: [
+        'INVOICE_VIEW',
+        'INVOICE_EDIT',
+        'INVOICE_APPROVE',
+        'INVOICE_REJECT',
+        'EXPORT_EXECUTE',
+        'EXPORT_REVERSE',
+        'CONFIG_FIELDS',
+        'CONFIG_RULES',
+        'CONFIG_MASTER_DATA',
+        'CONFIG_SYSTEM',
+      ],
+      must_change_password: false,
+      mfa_enabled: false,
+      auth_provider: 'LOCAL',
+      session_expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+    };
+  });
+
   const { documents, setDocuments } = useInvoiceFlowStore();
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('invoiceflow_user_session', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('invoiceflow_user_session');
+    }
+  }, [currentUser]);
 
   const handleDocumentIngested = (newDoc: any) => {
     setDocuments([newDoc, ...documents]);
     setCurrentTab('workbench');
   };
 
+  const handleLoginSuccess = (session: UserSession) => {
+    setCurrentUser(session);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setIsAuthModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans">
-      {/* Top Bar Contract (3 zones, wordmark, single-line actions) */}
+      {/* Top Bar Contract (3 zones, wordmark, single-line actions, user auth badge) */}
       <Header
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         onOpenIngest={() => setIsIngestModalOpen(true)}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       {/* Main Workspace: Sidebar + Viewport */}
@@ -79,11 +138,20 @@ export default function App() {
         </main>
       </div>
 
-      {/* Ingestion & Pipeline Execution Modal */}
+      {/* Ingestion & Pipeline Execution Modal (Strict Document-First) */}
       <IngestModal
         isOpen={isIngestModalOpen}
         onClose={() => setIsIngestModalOpen(false)}
         onSuccess={handleDocumentIngested}
+      />
+
+      {/* Identity, Access Matrix & First-Admin Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentUser={currentUser}
+        onLoginSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
       />
     </div>
   );

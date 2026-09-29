@@ -707,6 +707,22 @@ CREATE TABLE IF NOT EXISTS ocr_word_box (
     confidence NUMERIC(5,2) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS document_artifact (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+    artifact_type VARCHAR(40) NOT NULL DEFAULT 'ORIGINAL_FILE', -- ORIGINAL_FILE, PAGE_IMAGE, OCR_JSON, PROMPT_SNAPSHOT
+    original_filename VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(120) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    sha256_hash CHAR(64) NOT NULL,
+    storage_uri VARCHAR(1000) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_artifact_storage CHECK (length(storage_uri) > 0),
+    CONSTRAINT chk_artifact_sha256 CHECK (length(sha256_hash) = 64)
+);
+CREATE INDEX idx_artifact_doc ON document_artifact(document_id);
+CREATE INDEX idx_artifact_hash ON document_artifact(sha256_hash);
+
 CREATE TABLE IF NOT EXISTS extracted_field_value (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL REFERENCES document(id) ON DELETE CASCADE,
@@ -715,7 +731,11 @@ CREATE TABLE IF NOT EXISTS extracted_field_value (
     raw_extracted_value TEXT,
     normalized_value TEXT,
     confidence_score NUMERIC(5,2) NOT NULL DEFAULT 0.00,
-    extraction_source VARCHAR(40) NOT NULL DEFAULT 'AI', -- AI, OCR_REGEX, MASTER_MATCH, USER_OVERRIDE, RULE_DEFAULT
+    value_source VARCHAR(30) NOT NULL DEFAULT 'EXTRACTED' CHECK (value_source IN ('EXTRACTED', 'DERIVED', 'MASTER_DEFAULT', 'USER_CORRECTED', 'NOT_FOUND')),
+    source_page INT DEFAULT 1,
+    extractor_name VARCHAR(100) DEFAULT 'GEMINI_AI',
+    ai_model_version VARCHAR(100),
+    rule_id UUID,
     bounding_box JSONB, -- {x, y, w, h, page}
     is_manually_edited BOOLEAN NOT NULL DEFAULT FALSE,
     edited_by VARCHAR(120),
@@ -724,6 +744,7 @@ CREATE TABLE IF NOT EXISTS extracted_field_value (
     CONSTRAINT uq_doc_field UNIQUE (document_id, field_key)
 );
 CREATE INDEX idx_extracted_field_key ON extracted_field_value(field_key);
+CREATE INDEX idx_extracted_source ON extracted_field_value(value_source);
 
 CREATE TABLE IF NOT EXISTS document_line_item (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -950,4 +971,63 @@ CREATE OR REPLACE TRIGGER trg_document_updated_at BEFORE UPDATE ON document FOR 
 CREATE OR REPLACE TRIGGER trg_rule_updated_at BEFORE UPDATE ON rule FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 CREATE OR REPLACE TRIGGER trg_export_prof_updated_at BEFORE UPDATE ON export_profile FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 
+-- =============================================================================
+-- 13. ROW-LEVEL SECURITY (RLS) POLICIES
+-- Multi-tenant and department-scoped access control
+-- =============================================================================
+
+ALTER TABLE document ENABLE ROW LEVEL SECURITY;
+ALTER TABLE document_line_item ENABLE ROW LEVEL SECURITY;
+ALTER TABLE extracted_field_value ENABLE ROW LEVEL SECURITY;
+ALTER TABLE validation_result ENABLE ROW LEVEL SECURITY;
+
+-- Allow unrestricted access to administrative roles, while scoping departmental users
+DROP POLICY IF EXISTS p_doc_tenant_isolation ON document;
+CREATE POLICY p_doc_tenant_isolation ON document
+    FOR ALL
+    USING (
+        CURRENT_SETTING('invoiceflow.current_role', TRUE) = 'SUPERADMIN'
+        OR company_code_id IS NULL
+        OR company_code_id::TEXT = CURRENT_SETTING('invoiceflow.current_company_code', TRUE)
+    );
+
+DROP POLICY IF EXISTS p_doc_lines_isolation ON document_line_item;
+CREATE POLICY p_doc_lines_isolation ON document_line_item
+    FOR ALL
+    USING (
+        CURRENT_SETTING('invoiceflow.current_role', TRUE) = 'SUPERADMIN'
+        OR EXISTS (
+            SELECT 1 FROM document d
+            WHERE d.id = document_line_item.document_id
+            AND (d.company_code_id IS NULL OR d.company_code_id::TEXT = CURRENT_SETTING('invoiceflow.current_company_code', TRUE))
+        )
+    );
+
+-- Audit log trigger capture function
+CREATE OR REPLACE FUNCTION trigger_capture_audit_log()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO invoiceflow.audit_log (
+        id, event_timestamp, actor_name, action, entity_name, entity_id, before_state, after_state
+    ) VALUES (
+        gen_random_uuid(),
+        CURRENT_TIMESTAMP,
+        COALESCE(CURRENT_SETTING('invoiceflow.current_user', TRUE), 'system'),
+        TG_OP,
+        TG_TABLE_NAME,
+        COALESCE(NEW.id, OLD.id)::TEXT,
+        CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) ELSE NULL END,
+        CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) ELSE NULL END
+    );
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_field_def_audit AFTER INSERT OR UPDATE OR DELETE ON field_definition
+    FOR EACH ROW EXECUTE FUNCTION trigger_capture_audit_log();
+
+CREATE OR REPLACE TRIGGER trg_rule_audit AFTER INSERT OR UPDATE OR DELETE ON rule
+    FOR EACH ROW EXECUTE FUNCTION trigger_capture_audit_log();
+
 -- Schema Creation Complete
+

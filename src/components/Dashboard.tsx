@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FileText,
   CheckCircle2,
@@ -9,8 +9,11 @@ import {
   AlertCircle,
   ArrowRight,
   TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 import { useInvoiceFlowStore } from '../store/useInvoiceFlowStore';
+import { PreflightChecker } from './PreflightChecker';
+import { SetupWizard } from './SetupWizard';
 
 interface DashboardProps {
   onSelectTab: (tab: string) => void;
@@ -18,7 +21,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onSelectTab, onOpenIngest }) => {
-  const { documents, exportRuns, settings } = useInvoiceFlowStore();
+  const { documents, exportRuns, settings, vendors } = useInvoiceFlowStore();
+  const [showWizard, setShowWizard] = useState(false);
 
   const totalDocs = documents.length;
   const approvedDocs = documents.filter((d) => d.document_status === 'APPROVED' || d.document_status === 'EXPORTED').length;
@@ -27,9 +31,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectTab, onOpenIngest 
 
   const stpRate = totalDocs > 0 ? Math.round((stpDocs / totalDocs) * 100) : 0;
   const totalVolume = documents.reduce((acc, d) => acc + (d.total_amount || 0), 0);
+  const isMasterDataEmpty = vendors.length === 0;
 
   return (
     <div className="space-y-6">
+      {/* Setup Incomplete / Wizard Banner */}
+      {isMasterDataEmpty && !showWizard && (
+        <div className="p-3.5 bg-blue-950/40 border border-blue-800/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+            <div>
+              <span className="font-semibold text-white">Fresh Deployment Detected:</span>
+              <span className="text-neutral-300 ml-1">
+                Master data tables are empty by design. Launch the 13-stage Setup Wizard to configure your organization.
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowWizard(true)}
+            className="px-3 py-1 font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded transition-colors whitespace-nowrap self-start sm:self-auto"
+          >
+            Launch Setup Wizard
+          </button>
+        </div>
+      )}
+
+      {showWizard && (
+        <SetupWizard onClose={() => setShowWizard(false)} onSelectTab={onSelectTab} />
+      )}
+
+      {/* Pre-Flight Health Widget */}
+      <PreflightChecker onSelectTab={onSelectTab} />
+
       {/* Top Header Section */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
         <div>
@@ -52,7 +85,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectTab, onOpenIngest 
             onClick={onOpenIngest}
             className="px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors shadow-sm"
           >
-            + Ingest Invoice
+            Upload Source Document
           </button>
         </div>
       </div>

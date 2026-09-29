@@ -28,12 +28,20 @@ export type DocumentStatus =
   | 'PREPROCESSED'
   | 'OCR_DONE'
   | 'AI_EXTRACTED'
+  | 'EXTRACTION_FAILED'
   | 'VALIDATED'
   | 'REVIEW_PENDING'
   | 'APPROVED'
   | 'REJECTED'
   | 'EXPORTED'
   | 'ARCHIVED';
+
+export type ValueSource =
+  | 'EXTRACTED'
+  | 'DERIVED'
+  | 'MASTER_DEFAULT'
+  | 'USER_CORRECTED'
+  | 'NOT_FOUND';
 
 export interface BoundingBox {
   x: number; // percentage 0-100
@@ -48,9 +56,24 @@ export interface ExtractedField {
   raw_value: string;
   normalized_value: string;
   confidence: number; // 0 - 100
-  source: 'AI' | 'OCR' | 'RULE' | 'MANUAL';
-  bbox?: BoundingBox;
+  value_source: ValueSource;
+  source_page?: number;
+  source_bounding_box?: BoundingBox;
+  extractor_name?: string;
+  ai_model_version?: string;
+  rule_id?: string;
   is_edited?: boolean;
+}
+
+export interface DocumentArtifact {
+  id: string;
+  document_id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  sha256_hash: string;
+  storage_uri: string;
+  created_at: string;
 }
 
 export interface InvoiceLineItem {
@@ -66,6 +89,7 @@ export interface InvoiceLineItem {
   tax_amount: number;
   cost_center_code: string;
   gl_account_code: string;
+  value_source?: ValueSource;
 }
 
 export interface DocumentRecord {
@@ -83,6 +107,9 @@ export interface DocumentRecord {
   tax_amount: number;
   currency_code: string;
   document_date: string;
+  document_artifact_id: string;
+  document_artifact_sha256: string;
+  document_artifact_uri: string;
   approved_at?: string;
   approved_by?: string;
   vendor_code?: string;
@@ -97,6 +124,8 @@ export interface DocumentRecord {
   fields: Record<string, ExtractedField>;
   line_items: InvoiceLineItem[];
   sample_image_url?: string;
+  raw_ocr_text?: string;
+  raw_ai_response?: string;
   validation_errors: ValidationError[];
 }
 
@@ -328,4 +357,18 @@ export interface SystemSettingsConfig {
   sandbox_mode: boolean;
   default_erp: string;
   date_format: string;
+}
+
+export interface UserSession {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string;
+  role: 'SUPER_ADMIN' | 'REVIEWER' | 'APPROVER' | 'AUDITOR';
+  permissions: string[];
+  must_change_password?: boolean;
+  mfa_enabled?: boolean;
+  mfa_verified?: boolean;
+  auth_provider: 'LOCAL' | 'ENTRA_ID_SSO' | 'BREAK_GLASS';
+  session_expires_at: string;
 }
