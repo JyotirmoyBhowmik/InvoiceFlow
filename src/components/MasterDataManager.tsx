@@ -73,10 +73,10 @@ export const MasterDataManager: React.FC = () => {
   const [companyCodeForm, setCompanyCodeForm] = useState({
     code: '',
     name: '',
-    country_code: 'USA',
-    currency_code: 'USD',
-    chart_of_accounts: 'CAUS',
-    fiscal_variant: 'K4',
+    country_code: 'IND',
+    currency_code: 'INR',
+    chart_of_accounts: 'CAIN',
+    fiscal_variant: 'V3',
   });
 
   const [categoryForm, setCategoryForm] = useState({
@@ -100,7 +100,7 @@ export const MasterDataManager: React.FC = () => {
   const [currencyForm, setCurrencyForm] = useState({
     code: '',
     name: '',
-    symbol: '$',
+    symbol: '₹',
     decimal_places: 2,
     exchange_rate_to_base: 1.0,
     is_base_currency: false,
@@ -179,7 +179,7 @@ export const MasterDataManager: React.FC = () => {
     ]);
     store.addLog('MASTER_DATA', 'COMPANY_CODE_CREATED', 'SUCCESS', `Company code created: ${companyCodeForm.code} - ${companyCodeForm.name}`);
     setIsAdding(false);
-    setCompanyCodeForm({ code: '', name: '', country_code: 'USA', currency_code: 'USD', chart_of_accounts: 'CAUS', fiscal_variant: 'K4' });
+    setCompanyCodeForm({ code: '', name: '', country_code: 'IND', currency_code: 'INR', chart_of_accounts: 'CAIN', fiscal_variant: 'V3' });
   };
 
   const handleAddCategory = () => {
@@ -228,7 +228,7 @@ export const MasterDataManager: React.FC = () => {
     ]);
     store.addLog('MASTER_DATA', 'CURRENCY_CREATED', 'SUCCESS', `Currency created: ${currencyForm.code}`);
     setIsAdding(false);
-    setCurrencyForm({ code: '', name: '', symbol: '$', decimal_places: 2, exchange_rate_to_base: 1.0, is_base_currency: false });
+    setCurrencyForm({ code: '', name: '', symbol: '₹', decimal_places: 2, exchange_rate_to_base: 1.0, is_base_currency: false });
   };
 
   const downloadJsonTemplate = (type: string) => {

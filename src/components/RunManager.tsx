@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useInvoiceFlowStore } from '../store/useInvoiceFlowStore';
 import { ExportRunRecord, DocumentRecord } from '../types';
+import { formatINR } from '../utils/currency';
 
 export const RunManager: React.FC = () => {
   const { exportRuns, setExportRuns, documents, setDocuments, exportProfile, addLog } =
@@ -126,7 +127,7 @@ export const RunManager: React.FC = () => {
           } else if (col.source_field_key === 'company_code') {
             val = doc.company_code || '1000';
           } else if (col.source_field_key === 'currency') {
-            val = doc.currency_code || 'USD';
+            val = doc.currency_code || 'INR';
           } else if (col.source_field_key === 'invoice_number') {
             val = doc.document_number;
           } else if (col.source_field_key === 'vendor_code') {
@@ -198,7 +199,7 @@ export const RunManager: React.FC = () => {
       'EXPORT_ENGINE',
       'RUN_COMPLETED',
       'SUCCESS',
-      `SAP ECC Export Run ${runNumber} generated: ${approvedDocs.length} documents ($${totalDebit.toFixed(2)})`,
+      `SAP ECC Export Run ${runNumber} generated: ${approvedDocs.length} documents (${formatINR(totalDebit)})`,
       145,
       undefined,
       undefined,
@@ -364,7 +365,7 @@ export const RunManager: React.FC = () => {
                   <td className="py-2.5 px-3 font-mono text-neutral-400">{run.profile_key}</td>
                   <td className="py-2.5 px-3 text-center font-mono">{run.total_documents}</td>
                   <td className="py-2.5 px-3 font-mono-tabular text-right text-emerald-400 font-semibold">
-                    ${run.total_debit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatINR(run.total_debit)}
                   </td>
                   <td className="py-2.5 px-3">
                     <span
@@ -434,7 +435,7 @@ export const RunManager: React.FC = () => {
               <div>
                 <h3 className="text-sm font-semibold text-white">SAP File Artifact: {selectedRun.run_number}</h3>
                 <span className="text-[11px] font-mono text-neutral-400">
-                  {selectedRun.total_documents} documents · Control Total: ${selectedRun.total_debit.toFixed(2)}
+                  {selectedRun.total_documents} documents · Control Total: {formatINR(selectedRun.total_debit)}
                 </span>
               </div>
               <button onClick={() => setSelectedRun(null)} className="text-neutral-400 hover:text-white">

@@ -106,6 +106,10 @@ export interface DocumentRecord {
   total_amount: number;
   tax_amount: number;
   currency_code: string;
+  base_currency?: string;
+  exchange_rate_to_inr?: number;
+  converted_total_inr?: number;
+  converted_tax_inr?: number;
   document_date: string;
   document_artifact_id: string;
   document_artifact_sha256: string;

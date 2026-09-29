@@ -5,7 +5,7 @@ import { UserSession } from '../types';
 
 interface HeaderProps {
   currentTab: string;
-  onSelectTab: (tab: string) => void;
+  onSelectTab: (tab: string, docId?: string) => void;
   onOpenIngest: () => void;
   currentUser: UserSession | null;
   onOpenAuth: () => void;

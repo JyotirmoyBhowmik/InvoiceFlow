@@ -62,6 +62,7 @@ export default function App() {
   });
 
   const { documents, setDocuments } = useInvoiceFlowStore();
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -73,7 +74,15 @@ export default function App() {
 
   const handleDocumentIngested = (newDoc: any) => {
     setDocuments([newDoc, ...documents]);
+    setSelectedDocId(newDoc.id);
     setCurrentTab('workbench');
+  };
+
+  const handleSelectTab = (tab: string, docId?: string) => {
+    setCurrentTab(tab);
+    if (docId) {
+      setSelectedDocId(docId);
+    }
   };
 
   const handleLoginSuccess = (session: UserSession) => {
@@ -90,7 +99,7 @@ export default function App() {
       {/* Top Bar Contract (3 zones, wordmark, single-line actions, user auth badge) */}
       <Header
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={handleSelectTab}
         onOpenIngest={() => setIsIngestModalOpen(true)}
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthModalOpen(true)}
@@ -98,18 +107,24 @@ export default function App() {
 
       {/* Main Workspace: Sidebar + Viewport */}
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} />
+        <Sidebar currentTab={currentTab} onSelectTab={handleSelectTab} />
 
         <main className="flex-1 overflow-y-auto p-6 bg-neutral-950/40">
           <div className="max-w-7xl mx-auto space-y-6">
             {currentTab === 'dashboard' && (
               <Dashboard
-                onSelectTab={setCurrentTab}
+                onSelectTab={handleSelectTab}
                 onOpenIngest={() => setIsIngestModalOpen(true)}
               />
             )}
 
-            {currentTab === 'workbench' && <Workbench />}
+            {currentTab === 'workbench' && (
+              <Workbench
+                selectedDocId={selectedDocId}
+                onSelectDocId={setSelectedDocId}
+                onOpenIngest={() => setIsIngestModalOpen(true)}
+              />
+            )}
 
             {currentTab === 'runs' && <RunManager />}
 

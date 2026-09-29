@@ -85,3 +85,26 @@ If a human reviewer changes a value:
 }
 ```
 All corrections generate an immutable entry in the partitioned `process_log` table.
+
+---
+
+## 5. Addendum: Resolution of "Apex Industrial Solutions" Display Defect
+
+### Defect Report
+When an operator uploaded a real invoice file via the **Upload Source Document** modal, the Review Workbench continued to display **"Apex Industrial Solutions Ltd." (#INV-2026-9042)** instead of the operator's uploaded file.
+
+### Root Cause Analysis
+1. **State Desynchronization in `Workbench.tsx`**: `Workbench` initialized `selectedDocId` via `useState` on initial mount. When `App.tsx` prepended the newly ingested document to the document array (`setDocuments([newDoc, ...documents])`), it did not update `selectedDocId`. Because the sample document (`Apex Industrial`) already existed in the store from previous sample evaluations, `currentDoc` continued resolving to the older document ID.
+2. **Missing Real Artifact Visualizer in `Workbench.tsx`**: The left pane of the Workbench did not render the actual uploaded binary file. Instead, it rendered an HTML paper invoice simulation that had hardcoded mock templates and fallback dates.
+3. **Suppressed PDF Preview URLs**: In `IngestModal.tsx`, `filePreviewUrl` was explicitly set to `null` whenever `!file.type.startsWith('image/')`, stripping preview URLs from all PDF uploads.
+4. **Buffer Truncation**: Text extraction was constrained to `fileBuffer.slice(0, 8000)`, missing text streams in larger or compressed PDF documents.
+
+### Remediated Fix
+1. **Explicit Selection Synchronization**: `App.tsx` now manages `selectedDocId` centrally. Upon document ingestion, `selectedDocId` is immediately set to `newDoc.id`, and `Workbench` updates active selection automatically via a reactive effect.
+2. **Native Artifact Rendering**:
+   - **PDF Invoices**: Rendered in an interactive embedded PDF viewer with zoom, full multi-page navigation, and a direct "Open Full PDF" link.
+   - **Image Invoices**: Rendered with high-resolution image canvas and animated bounding box highlights tied to active field selection.
+   - **Multi-Tab Cockpit**: Added tabs for **Source File Viewer**, **Raw OCR Text** (showing full character density and token streams), and **AI Evidence**.
+3. **Persistent Preview Storage**: Preserves both `URL.createObjectURL` and Base64 Data URLs so previews remain responsive across tab changes.
+4. **Comprehensive Text & Token Extraction**: Scans the full buffer and decodes PDF operators (`Tj`, `TJ`, stream delimiters, Latin-1 text runs) for genuine uploaded documents.
+5. **Document Management & Discard**: Operators can discard or delete any test sample document with one click using the **Discard** button in the Workbench toolbar.

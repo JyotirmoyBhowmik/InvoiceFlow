@@ -35,10 +35,10 @@ export const RuleBuilder: React.FC = () => {
     JSON.stringify(
       {
         expense_category: 'HOTEL',
-        total_amount: 450.0,
-        currency: 'USD',
-        vendor_name: 'Marriott Downtown',
-        country_code: 'USA',
+        total_amount: 4500.0,
+        currency: 'INR',
+        vendor_name: 'Taj Mahal Palace Mumbai',
+        country_code: 'IND',
       },
       null,
       2

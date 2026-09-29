@@ -173,10 +173,10 @@ const INITIAL_FIELD_DEFINITIONS: FieldDefinition[] = [
     ui_order: 110,
     visible_flag: true,
     editable_flag: true,
-    ai_hint_text: 'ISO 3-letter currency code (e.g. USD, NPR, EUR, INR)',
+    ai_hint_text: 'ISO 3-letter currency code (Base: INR, or foreign: USD, EUR, GBP, AED)',
     export_column_name: 'WAERS',
     export_order: 10,
-    options: ['USD', 'NPR', 'EUR', 'INR', 'GBP'],
+    options: ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'NPR'],
   },
   {
     id: 'f12',
@@ -506,7 +506,7 @@ const INITIAL_THEME: ThemeConfig = {
 };
 
 const INITIAL_SETTINGS: SystemSettingsConfig = {
-  timezone: 'Asia/Kathmandu',
+  timezone: 'Asia/Kolkata',
   stp_auto_approve_threshold: 95.0,
   max_archive_depth: 4,
   max_archive_mb: 150,

@@ -20,7 +20,7 @@ import {
 
 interface SidebarProps {
   currentTab: string;
-  onSelectTab: (tab: string) => void;
+  onSelectTab: (tab: string, docId?: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => {

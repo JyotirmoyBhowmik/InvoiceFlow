@@ -5,7 +5,6 @@ import {
   Clock,
   Send,
   Zap,
-  DollarSign,
   AlertCircle,
   ArrowRight,
   TrendingUp,
@@ -14,9 +13,10 @@ import {
 import { useInvoiceFlowStore } from '../store/useInvoiceFlowStore';
 import { PreflightChecker } from './PreflightChecker';
 import { SetupWizard } from './SetupWizard';
+import { formatINR, formatOriginalCurrency, convertToINR } from '../utils/currency';
 
 interface DashboardProps {
-  onSelectTab: (tab: string) => void;
+  onSelectTab: (tab: string, docId?: string) => void;
   onOpenIngest: () => void;
 }
 
@@ -30,7 +30,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectTab, onOpenIngest 
   const stpDocs = documents.filter((d) => d.is_stp_approved).length;
 
   const stpRate = totalDocs > 0 ? Math.round((stpDocs / totalDocs) * 100) : 0;
-  const totalVolume = documents.reduce((acc, d) => acc + (d.total_amount || 0), 0);
+  const totalInrVolume = documents.reduce((acc, d) => {
+    const inr = d.converted_total_inr || convertToINR(d.total_amount, d.currency_code);
+    return acc + (inr || 0);
+  }, 0);
   const isMasterDataEmpty = vendors.length === 0;
 
   return (
@@ -134,13 +137,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectTab, onOpenIngest 
         <div className="p-4 rounded-lg bg-neutral-900/60 border border-neutral-800">
           <div className="flex items-center justify-between text-neutral-400 text-xs font-medium">
             <span>Total Gross Invoiced</span>
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <span className="font-mono text-xs font-bold text-emerald-400">₹ INR</span>
           </div>
           <div className="mt-2 text-2xl font-bold tracking-tight text-white font-mono-tabular">
-            ${totalVolume.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatINR(totalInrVolume)}
           </div>
           <div className="mt-2 text-[11px] text-neutral-500">
-            Across active document currency conversions
+            Base accounting currency · Converted from all foreign invoices
           </div>
         </div>
       </div>
@@ -199,14 +202,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectTab, onOpenIngest 
                       <td className="py-2.5">{doc.vendor_name || 'Unresolved Vendor'}</td>
                       <td className="py-2.5 font-mono text-neutral-400">{doc.expense_category || 'MISC'}</td>
                       <td className="py-2.5 font-mono-tabular text-right">
-                        ${doc.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <div className="text-white font-medium">
+                          {doc.currency_code === 'INR'
+                            ? formatINR(doc.total_amount)
+                            : formatOriginalCurrency(doc.total_amount, doc.currency_code)}
+                        </div>
+                        {doc.currency_code !== 'INR' && (
+                          <div className="text-[10px] text-emerald-400 font-mono">
+                            ≈ {formatINR(doc.converted_total_inr || convertToINR(doc.total_amount, doc.currency_code))}
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 text-amber-400/90 truncate max-w-[180px]">
                         {doc.review_reason || 'Confidence below threshold'}
                       </td>
                       <td className="py-2.5 text-right">
                         <button
-                          onClick={() => onSelectTab('workbench')}
+                          onClick={() => onSelectTab('workbench', doc.id)}
                           className="px-2 py-1 text-[11px] font-medium text-blue-400 hover:text-white bg-blue-950/60 hover:bg-blue-900/60 border border-blue-800/50 rounded transition-colors"
                         >
                           Review

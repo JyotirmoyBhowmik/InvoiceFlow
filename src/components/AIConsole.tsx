@@ -18,8 +18,8 @@ export const AIConsole: React.FC = () => {
 
   const [activeProvider, setActiveProvider] = useState<'GEMINI' | 'AZURE_DI' | 'OPENAI' | 'ANTHROPIC'>('GEMINI');
   const [modelName, setModelName] = useState('gemini-2.5-flash');
-  const [monthlyBudgetUsd, setMonthlyBudgetUsd] = useState(100.0);
-  const [currentSpendUsd, setCurrentSpendUsd] = useState(14.85);
+  const [monthlyBudgetInr, setMonthlyBudgetInr] = useState(8500.0);
+  const [currentSpendInr, setCurrentSpendInr] = useState(1285.50);
 
   const [systemInstruction, setSystemInstruction] = useState(
     `You are a strict, enterprise invoice data extraction engine for SAP ECC accounting.
@@ -28,21 +28,21 @@ Zero hallucination: if a field is not present in the document, return null. Retu
   );
 
   const [userPromptPattern, setUserPromptPattern] = useState(
-    `Extract invoice data conforming strictly to the requested schema. Document type: INVOICE. Base Currency: USD.`
+    `Extract invoice data conforming strictly to the requested schema. Document type: INVOICE. Base Currency: INR.`
   );
 
   const [testPayload, setTestPayload] = useState(
     `INVOICE #INV-889021
 Date: 2026-09-15
-Vendor: Pacific Industrial Parts Inc.
-Tax ID: PAN-88491029
-Bill To: Enterprise Holding Ltd (Company Code: 1000)
+Vendor: Pacific Industrial Parts Pvt. Ltd.
+Tax ID: GSTIN: 27AABCP8849J1ZK
+Bill To: Enterprise Global India Pvt. Ltd. (Company Code: 1000)
 Items:
-1. Hydraulic Pump Seal Kit - 2 EA @ $150.00 = $300.00
-2. High-Pressure Hose 10m - 1 EA @ $120.00 = $120.00
-Net Amount: $420.00
-VAT (10%): $42.00
-Total Due: $462.00`
+1. Hydraulic Pump Seal Kit - 2 EA @ ₹15,000.00 = ₹30,000.00
+2. High-Pressure Hose 10m - 1 EA @ ₹12,000.00 = ₹12,000.00
+Net Amount: ₹42,000.00
+GST (18%): ₹7,560.00
+Total Due: ₹49,560.00`
   );
 
   const [sandboxResult, setSandboxResult] = useState<any>(null);
@@ -82,28 +82,28 @@ Total Due: $462.00`
         vendor_tax_id: 'PAN-88491029',
         company_code: '1000',
         expense_category: 'MISC',
-        currency: 'USD',
-        taxable_value: 420.0,
-        tax_code: 'V1',
-        tax_amount: 42.0,
-        total_cost: 462.0,
+        currency: 'INR',
+        taxable_value: 42000.0,
+        tax_code: 'GST18',
+        tax_amount: 7560.0,
+        total_cost: 49560.0,
         remarks: 'Hydraulic Pump Seal Kit + Hose',
       };
 
       const duration = Math.round(performance.now() - start + 280);
       const inTokens = Math.round(testPayload.length / 4);
       const outTokens = 180;
-      const cost = inTokens * 0.0000001 + outTokens * 0.0000004;
+      const costInr = (inTokens * 0.0000001 + outTokens * 0.0000004) * 86.5;
 
       setSandboxResult({
         extracted_fields: extractedData,
         tokens: { input: inTokens, output: outTokens },
-        cost_usd: cost.toFixed(6),
+        cost_inr: costInr.toFixed(4),
         duration_ms: duration,
         status: 'SUCCESS',
       });
 
-      setCurrentSpendUsd((prev) => prev + cost);
+      setCurrentSpendInr((prev) => prev + costInr);
 
       addLog(
         'AI_ENGINE',
@@ -165,20 +165,20 @@ Total Due: $462.00`
         <div className="p-4 rounded-lg bg-neutral-900/60 border border-neutral-800 space-y-2">
           <div className="flex items-center justify-between text-neutral-400 text-xs font-medium">
             <span>Monthly AI Token Budget</span>
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <span className="font-mono text-xs font-bold text-emerald-400">₹ INR</span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-lg font-bold text-white font-mono-tabular">
-              ${currentSpendUsd.toFixed(2)} / ${monthlyBudgetUsd.toFixed(2)}
+              ₹{currentSpendInr.toFixed(2)} / ₹{monthlyBudgetInr.toFixed(2)}
             </span>
             <span className="text-xs font-mono text-emerald-400">
-              {Math.round((currentSpendUsd / monthlyBudgetUsd) * 100)}% Used
+              {Math.round((currentSpendInr / monthlyBudgetInr) * 100)}% Used
             </span>
           </div>
           <div className="w-full bg-neutral-800 h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-emerald-500 h-full rounded-full"
-              style={{ width: `${Math.min(100, (currentSpendUsd / monthlyBudgetUsd) * 100)}%` }}
+              style={{ width: `${Math.min(100, (currentSpendInr / monthlyBudgetInr) * 100)}%` }}
             />
           </div>
         </div>
@@ -264,7 +264,7 @@ Total Due: $462.00`
                   <div className="flex items-center justify-between text-[11px] text-neutral-500 pb-1 border-b border-neutral-800">
                     <span className="text-emerald-400 font-semibold">{sandboxResult.status}</span>
                     <span>
-                      Duration: {sandboxResult.duration_ms}ms · Cost: ${sandboxResult.cost_usd}
+                      Duration: {sandboxResult.duration_ms}ms · Cost: ₹{sandboxResult.cost_inr}
                     </span>
                   </div>
                   <pre className="text-neutral-200 text-[11px]">
