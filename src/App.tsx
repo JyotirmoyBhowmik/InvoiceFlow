@@ -61,7 +61,7 @@ export default function App() {
     };
   });
 
-  const { documents, setDocuments } = useInvoiceFlowStore();
+  const { documents, setDocuments, theme } = useInvoiceFlowStore();
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,7 +95,13 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans">
+    <div
+      className="min-h-screen flex flex-col font-sans transition-colors duration-200"
+      style={{
+        backgroundColor: 'var(--color-bg)',
+        color: 'var(--color-text-main)',
+      }}
+    >
       {/* Top Bar Contract (3 zones, wordmark, single-line actions, user auth badge) */}
       <Header
         currentTab={currentTab}
@@ -109,7 +115,13 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar currentTab={currentTab} onSelectTab={handleSelectTab} />
 
-        <main className="flex-1 overflow-y-auto p-6 bg-neutral-950/40">
+        <main
+          className="flex-1 overflow-y-auto p-6"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--color-bg) 90%, var(--color-surface) 10%)',
+          }}
+        >
+
           <div className="max-w-7xl mx-auto space-y-6">
             {currentTab === 'dashboard' && (
               <Dashboard

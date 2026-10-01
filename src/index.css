@@ -23,9 +23,9 @@
     --color-error: #ef4444;
     --color-info: #38bdf8;
     
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --radius-lg: 8px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
     
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-display: 'Cabinet Grotesk', system-ui, sans-serif;
@@ -36,7 +36,75 @@
     background-color: var(--color-bg);
     color: var(--color-text-main);
     font-family: var(--font-sans);
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
+}
+
+/* Dynamic theme overrides so Tailwind classes bind to database & studio tokens */
+[data-theme-active="true"] .bg-neutral-950,
+[data-theme-active="true"] .bg-neutral-950\/80,
+[data-theme-active="true"] .bg-neutral-950\/90,
+[data-theme-active="true"] .bg-neutral-950\/60,
+[data-theme-active="true"] .bg-neutral-950\/40 {
+  background-color: var(--color-bg) !important;
+}
+
+[data-theme-active="true"] .bg-neutral-900,
+[data-theme-active="true"] .bg-neutral-900\/80,
+[data-theme-active="true"] .bg-neutral-900\/60,
+[data-theme-active="true"] .bg-neutral-900\/40,
+[data-theme-active="true"] .bg-neutral-900\/90 {
+  background-color: var(--color-surface) !important;
+}
+
+[data-theme-active="true"] .border-neutral-800,
+[data-theme-active="true"] .border-neutral-700 {
+  border-color: var(--color-border) !important;
+}
+
+/* Light Mode Overrides for Full WCAG Contrast */
+[data-theme="light"] {
+  --color-text-main: #0f172a;
+  --color-text-muted: #475569;
+  --color-text-subtle: #64748b;
+}
+
+[data-theme="light"] body {
+  background-color: var(--color-bg) !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-white,
+[data-theme="light"] .text-neutral-100 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-neutral-200 {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .text-neutral-300 {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .text-neutral-400 {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .text-neutral-500 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] code {
+  color: #0f172a !important;
 }
 
 .font-display {
@@ -47,3 +115,4 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+

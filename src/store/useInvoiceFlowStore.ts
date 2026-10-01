@@ -819,9 +819,9 @@ const INITIAL_EXPORT_PROFILE: ExportProfileDef = {
   ],
 };
 
-const INITIAL_THEME: ThemeConfig = {
+export const INITIAL_THEME: ThemeConfig = {
   theme_key: 'ENTERPRISE_SLATE',
-  theme_name: 'Enterprise Slate',
+  theme_name: 'Enterprise Slate (Dark)',
   color_bg: '#0c0e12',
   color_surface: '#141820',
   color_primary: '#3b82f6',
@@ -834,6 +834,67 @@ const INITIAL_THEME: ThemeConfig = {
   font_display: 'Cabinet Grotesk',
   font_mono: 'JetBrains Mono',
 };
+
+export function applyThemeToDom(targetTheme: ThemeConfig) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+
+  root.style.setProperty('--color-bg', targetTheme.color_bg);
+  root.style.setProperty('--color-surface', targetTheme.color_surface);
+  root.style.setProperty('--color-primary', targetTheme.color_primary);
+  root.style.setProperty('--color-accent', targetTheme.color_accent);
+  root.style.setProperty('--color-success', targetTheme.color_success);
+  root.style.setProperty('--color-warning', targetTheme.color_warning);
+  root.style.setProperty('--color-error', targetTheme.color_error);
+  root.style.setProperty('--radius-sm', targetTheme.radius_sm);
+
+  // Check brightness of color_bg
+  const hex = targetTheme.color_bg.replace('#', '');
+  let r = 12, g = 14, b = 18;
+  if (hex.length === 6) {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+  }
+  const isLight = (r * 299 + g * 587 + b * 114) / 1000 > 140;
+
+  if (isLight) {
+    root.setAttribute('data-theme', 'light');
+    root.style.setProperty('--color-surface-subtle', '#f1f5f9');
+    root.style.setProperty('--color-surface-elevated', '#ffffff');
+    root.style.setProperty('--color-border', '#cbd5e1');
+    root.style.setProperty('--color-border-subtle', '#e2e8f0');
+    root.style.setProperty('--color-text-main', '#0f172a');
+    root.style.setProperty('--color-text-muted', '#475569');
+    root.style.setProperty('--color-text-subtle', '#64748b');
+  } else {
+    root.setAttribute('data-theme', 'dark');
+    root.style.setProperty('--color-surface-subtle', '#1b202b');
+    root.style.setProperty('--color-surface-elevated', '#232938');
+    root.style.setProperty('--color-border', '#283042');
+    root.style.setProperty('--color-border-subtle', '#1e2433');
+    root.style.setProperty('--color-text-main', '#f1f5f9');
+    root.style.setProperty('--color-text-muted', '#94a3b8');
+    root.style.setProperty('--color-text-subtle', '#64748b');
+  }
+
+  root.setAttribute('data-theme-active', 'true');
+}
+
+// Immediately apply saved theme on initial script load
+if (typeof window !== 'undefined') {
+  try {
+    const saved = localStorage.getItem('invoiceflow_theme');
+    if (saved) {
+      applyThemeToDom(JSON.parse(saved));
+    } else {
+      applyThemeToDom(INITIAL_THEME);
+    }
+  } catch {
+    applyThemeToDom(INITIAL_THEME);
+  }
+}
+
 
 const INITIAL_SETTINGS: SystemSettingsConfig = {
   timezone: 'Asia/Kolkata',
@@ -868,10 +929,31 @@ export function useInvoiceFlowStore() {
     return saved ? JSON.parse(saved) : INITIAL_EXPORT_PROFILE;
   });
 
-  const [theme, setTheme] = useState<ThemeConfig>(() => {
+  const [theme, setThemeState] = useState<ThemeConfig>(() => {
     const saved = localStorage.getItem('invoiceflow_theme');
     return saved ? JSON.parse(saved) : INITIAL_THEME;
   });
+
+  const setTheme = (newTheme: ThemeConfig) => {
+    setThemeState(newTheme);
+    localStorage.setItem('invoiceflow_theme', JSON.stringify(newTheme));
+    applyThemeToDom(newTheme);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('invoiceflow_theme_changed', { detail: newTheme }));
+    }
+  };
+
+  useEffect(() => {
+    const handleThemeEvent = (e: any) => {
+      if (e.detail && (e.detail.theme_key !== theme.theme_key || e.detail.color_bg !== theme.color_bg)) {
+        setThemeState(e.detail);
+      }
+    };
+    window.addEventListener('invoiceflow_theme_changed', handleThemeEvent);
+    return () => {
+      window.removeEventListener('invoiceflow_theme_changed', handleThemeEvent);
+    };
+  }, [theme]);
 
   const [settings, setSettings] = useState<SystemSettingsConfig>(() => {
     const saved = localStorage.getItem('invoiceflow_settings');

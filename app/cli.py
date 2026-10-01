@@ -13,7 +13,12 @@ import hashlib
 import json
 import secrets
 from typing import Optional, List
-from sqlalchemy import text
+try:
+    from sqlalchemy import text
+except ImportError:
+    def text(query: str):
+        return query
+
 from app.db.session import AsyncSessionLocal
 
 
@@ -490,6 +495,7 @@ def main():
     p_worker = subparsers.add_parser("serve-worker", help="Run headless console worker for scheduled email ingestion & return dispatch")
     p_worker.add_argument("--cadence-minutes", type=int, default=60, help="Scheduler cadence in minutes (default 60 for hourly runs)")
     p_worker.add_argument("--stream", help="Specific processing stream to filter (default all active)")
+    p_worker.add_argument("--once", action="store_true", help="Execute single scheduler cycle and exit")
 
     # run-once (Execute single batch run and exit)
     p_ro = subparsers.add_parser("run-once", help="Execute single invoice processing run across streams and exit")
@@ -518,24 +524,24 @@ def main():
     args = parser.parse_args()
 
     async def cmd_serve_worker(args):
-        print("=" * 70)
-        print("INVOICEFLOW AUTONOMOUS HEADLESS WORKER SERVICE (Email-In / Email-Out)")
-        print(f"Cadence: Every {args.cadence_minutes} minutes | Stream: {args.stream or 'ALL ACTIVE'}")
-        print("Target SLA: Invoices processed at :00 run and returned with SAP/MIS package by :15")
-        print("=" * 70)
-        print("[INFO] Headless engine initialized with zero UI dependencies.")
-        print("[INFO] Scheduler registered: Polling Graph API mailboxes for Travel & Airline streams.")
-        print("[PASS] Worker running. Press Ctrl+C to terminate.")
+        from app.workers.headless_worker import HeadlessWorkerEngine
+        engine = HeadlessWorkerEngine(
+            cadence_minutes=getattr(args, "cadence_minutes", 60),
+            stream_filter=getattr(args, "stream", None)
+        )
+        if getattr(args, "once", False):
+            engine.run_single_batch()
+        else:
+            await engine.start_scheduler()
 
     async def cmd_run_once(args):
-        print("=" * 70)
-        print(f"INVOICEFLOW BATCH RUN EXECUTION — Stream: {args.stream or 'STREAM_A_ITH_TRAVEL'}")
-        print("=" * 70)
-        print("[STEP 1/4] Polling incoming email attachments...")
-        print("[STEP 2/4] Layer 1-3 OCR & Multi-modal AI extraction executing...")
-        print("[STEP 3/4] Deterministic validation against SAP master tables & tax regimes...")
-        print("[STEP 4/4] Generating SAP-ready file and comprehensive MIS package ZIP...")
-        print("[SUCCESS] Run completed. Generated SAP batch file and MIS package archive.")
+        from app.workers.headless_worker import HeadlessWorkerEngine
+        engine = HeadlessWorkerEngine(
+            cadence_minutes=60,
+            stream_filter=getattr(args, "stream", None)
+        )
+        engine.run_single_batch()
+
 
     async def cmd_eval(args):
         if getattr(args, "eval_command", None) == "create-set":

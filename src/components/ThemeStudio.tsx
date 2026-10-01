@@ -7,10 +7,12 @@ export const ThemeStudio: React.FC = () => {
   const { theme, setTheme, addLog } = useInvoiceFlowStore();
 
   const [formTheme, setFormTheme] = useState<ThemeConfig>({ ...theme });
-  const [activePreset, setActivePreset] = useState<string>('SLATE');
+  const [activePreset, setActivePreset] = useState<string>(theme.theme_key || 'SLATE');
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   const presets: Record<string, Partial<ThemeConfig>> = {
     SLATE: {
+      theme_key: 'SLATE',
       theme_name: 'Enterprise Slate (Dark)',
       color_bg: '#0c0e12',
       color_surface: '#141820',
@@ -21,8 +23,21 @@ export const ThemeStudio: React.FC = () => {
       color_error: '#ef4444',
       radius_sm: '6px',
     },
+    LIGHT: {
+      theme_key: 'LIGHT',
+      theme_name: 'Enterprise Light (Daylight)',
+      color_bg: '#f8fafc',
+      color_surface: '#ffffff',
+      color_primary: '#2563eb',
+      color_accent: '#d97706',
+      color_success: '#059669',
+      color_warning: '#d97706',
+      color_error: '#dc2626',
+      radius_sm: '6px',
+    },
     SAP_MIDNIGHT: {
-      theme_name: 'SAP Fiori Midnight',
+      theme_key: 'SAP_MIDNIGHT',
+      theme_name: 'SAP Fiori Horizon',
       color_bg: '#12171f',
       color_surface: '#1b222d',
       color_primary: '#0ea5e9',
@@ -32,8 +47,33 @@ export const ThemeStudio: React.FC = () => {
       color_error: '#f43f5e',
       radius_sm: '4px',
     },
+    EMERALD_FOREST: {
+      theme_key: 'EMERALD_FOREST',
+      theme_name: 'ITC / SNPL Corporate Green',
+      color_bg: '#09130d',
+      color_surface: '#112217',
+      color_primary: '#10b981',
+      color_accent: '#34d399',
+      color_success: '#10b981',
+      color_warning: '#f59e0b',
+      color_error: '#ef4444',
+      radius_sm: '6px',
+    },
+    NORDIC_FROST: {
+      theme_key: 'NORDIC_FROST',
+      theme_name: 'Deep Navy Frost',
+      color_bg: '#0a0f1d',
+      color_surface: '#131c31',
+      color_primary: '#38bdf8',
+      color_accent: '#818cf8',
+      color_success: '#34d399',
+      color_warning: '#fbbf24',
+      color_error: '#f87171',
+      radius_sm: '8px',
+    },
     HIGH_CONTRAST: {
-      theme_name: 'WCAG High Contrast',
+      theme_key: 'HIGH_CONTRAST',
+      theme_name: 'WCAG AAA High Contrast',
       color_bg: '#000000',
       color_surface: '#111111',
       color_primary: '#60a5fa',
@@ -47,17 +87,21 @@ export const ThemeStudio: React.FC = () => {
 
   const handleApplyPreset = (key: string) => {
     setActivePreset(key);
-    const updated = { ...formTheme, ...presets[key] };
+    const updated: ThemeConfig = { ...formTheme, ...presets[key] } as ThemeConfig;
     setFormTheme(updated);
     setTheme(updated);
     addLog('THEME', 'PRESET_APPLIED', 'SUCCESS', `Theme preset applied: ${updated.theme_name}`);
+    setSaveSuccessMsg(`Preset applied: ${updated.theme_name}`);
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
   const handleSaveTheme = () => {
     setTheme(formTheme);
-    addLog('THEME', 'TOKENS_UPDATED', 'SUCCESS', `Custom theme tokens emitted to :root CSS`);
-    alert('Theme tokens updated and emitted to CSS custom properties.');
+    addLog('THEME', 'TOKENS_UPDATED', 'SUCCESS', `Custom theme tokens emitted to CSS properties`);
+    setSaveSuccessMsg('Theme tokens saved and emitted across all UI components!');
+    setTimeout(() => setSaveSuccessMsg(null), 3500);
   };
+
 
   return (
     <div className="space-y-6">
@@ -81,8 +125,16 @@ export const ThemeStudio: React.FC = () => {
         </button>
       </div>
 
+      {/* Save Toast Notification */}
+      {saveSuccessMsg && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-medium animate-fadeIn">
+          <Check className="w-4 h-4 shrink-0 text-emerald-400" />
+          <span>{saveSuccessMsg}</span>
+        </div>
+      )}
+
       {/* Preset Selectors */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-neutral-400 font-medium">Quick Presets:</span>
         {Object.keys(presets).map((key) => (
           <button
@@ -90,14 +142,15 @@ export const ThemeStudio: React.FC = () => {
             onClick={() => handleApplyPreset(key)}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
               activePreset === key
-                ? 'bg-blue-600 text-white font-semibold'
-                : 'bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white'
+                ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                : 'bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800/60'
             }`}
           >
             {presets[key].theme_name}
           </button>
         ))}
       </div>
+
 
       {/* Design Token Matrix */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
