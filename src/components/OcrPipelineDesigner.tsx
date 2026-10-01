@@ -73,10 +73,18 @@ export const OcrPipelineDesigner: React.FC = () => {
     },
   ]);
 
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
+
   const handleToggleStep = (id: string) => {
     const updated = steps.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s));
     setSteps(updated);
     addLog('OCR_ENGINE', 'PIPELINE_STEP_TOGGLED', 'SUCCESS', `OCR pipeline step ${id} toggled`);
+  };
+
+  const handleSave = () => {
+    addLog('OCR_ENGINE', 'PIPELINE_SAVED', 'SUCCESS', 'OCR pipeline configurations saved');
+    setSaveSuccessMsg(true);
+    setTimeout(() => setSaveSuccessMsg(false), 3000);
   };
 
   return (
@@ -92,16 +100,20 @@ export const OcrPipelineDesigner: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            addLog('OCR_ENGINE', 'PIPELINE_SAVED', 'SUCCESS', 'OCR pipeline configurations saved');
-            alert('Pipeline configurations saved to database.');
-          }}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded transition-colors shadow-sm"
-        >
-          <Check className="w-4 h-4" />
-          <span>Save Pipeline Configuration</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {saveSuccessMsg && (
+            <span className="text-xs text-emerald-400 font-medium px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded flex items-center gap-1.5">
+              Pipeline saved!
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded transition-colors shadow-sm"
+          >
+            <Check className="w-4 h-4" />
+            <span>Save Pipeline Configuration</span>
+          </button>
+        </div>
       </div>
 
       {/* Pipeline Steps List */}

@@ -29,6 +29,9 @@ import {
   EvaluationSetRecord,
   EvaluationRunRecord,
   AiModelPricingEntity,
+  MailboxConfigEntity,
+  AiProviderConfigEntity,
+  PromptTemplateEntity,
 } from '../types';
 
 export const SEED_STREAMS: ProcessingStreamEntity[] = [
@@ -168,6 +171,138 @@ export const SEED_AI_MODEL_PRICING: AiModelPricingEntity[] = [
   { id: 'pr_flash', model_key: 'gemini-2.5-flash', provider_name: 'GOOGLE', price_per_1m_input_usd: 0.15, price_per_1m_output_usd: 0.60, benchmark_inr_target: 0.15, usd_to_inr_rate: 83.50, inr_to_npr_rate: 1.60, is_active: true },
   { id: 'pr_azure', model_key: 'azure-openai-gpt4o-mini', provider_name: 'AZURE_OPENAI', price_per_1m_input_usd: 0.15, price_per_1m_output_usd: 0.60, benchmark_inr_target: 0.20, usd_to_inr_rate: 83.50, inr_to_npr_rate: 1.60, is_active: true },
 ];
+
+export const SEED_MAILBOXES: MailboxConfigEntity[] = [
+  {
+    id: 'mbx_ith',
+    name: 'ITH Corporate Travel Desk',
+    email: 'travel.invoices@snpl.com.np',
+    protocol: 'GRAPH',
+    scope: 'ITH consolidated agency invoices, hotels, trains, and cabs (Stream A)',
+    stream_code: 'STREAM_A_ITH_TRAVEL',
+    tenant: 'ITC ITD Cloud / MS Graph Tenant',
+    client_id: 'c8491-enterprise-ith-client',
+    polling_interval_mins: 30,
+    status: 'MONITORING',
+    unread_count: 2,
+    folder_name: 'Inbox/TravelInvoices',
+    is_active: true,
+    created_at: '2026-09-01T08:00:00Z',
+  },
+  {
+    id: 'mbx_airline',
+    name: 'Airline GST/VAT Tax Invoices',
+    email: 'airline.gst@snpl.com.np',
+    protocol: 'GRAPH',
+    scope: 'Airline passenger ticket & tax credit invoices with PNR (Stream B)',
+    stream_code: 'STREAM_B_AIRLINE_TAX_CREDIT',
+    tenant: 'ITC ITD Cloud / MS Graph Tenant',
+    client_id: 'c8492-airline-tax-client',
+    polling_interval_mins: 15,
+    status: 'MONITORING',
+    unread_count: 1,
+    folder_name: 'Inbox/AirlineTax',
+    is_active: true,
+    created_at: '2026-09-01T08:00:00Z',
+  },
+  {
+    id: 'mbx_spool',
+    name: 'Filesystem Spool & Local Test Ingest',
+    email: 'local.spool@enterprise.internal',
+    protocol: 'LOCAL_SPOOL',
+    scope: 'Local directory spool (/data/inbox_spool) for automated test drops',
+    stream_code: 'STREAM_A_ITH_TRAVEL',
+    tenant: 'Local Server Filesystem',
+    polling_interval_mins: 5,
+    status: 'MONITORING',
+    unread_count: 0,
+    folder_name: '/data/inbox_spool',
+    is_active: true,
+    created_at: '2026-09-10T10:00:00Z',
+  },
+];
+
+export const SEED_AI_PROVIDERS: AiProviderConfigEntity[] = [
+  {
+    id: 'ai_gemini_flash',
+    provider_name: 'Google Gemini',
+    provider_key: 'GEMINI',
+    model_name: 'gemini-3.1-flash-lite',
+    endpoint_url: 'https://generativelanguage.googleapis.com/v1beta',
+    api_key_ref: 'GEMINI_API_KEY',
+    input_price_per_1m: 0.075,
+    output_price_per_1m: 0.30,
+    max_output_tokens: 4096,
+    temperature: 0.1,
+    fallback_order: 1,
+    is_primary: true,
+    is_active: true,
+    monthly_budget_inr: 8500.0,
+    current_spend_inr: 1285.50,
+  },
+  {
+    id: 'ai_azure_openai',
+    provider_name: 'Azure OpenAI',
+    provider_key: 'AZURE_OPENAI',
+    model_name: 'gpt-4o-mini',
+    endpoint_url: 'https://itc-openai-service.openai.azure.com/',
+    api_key_ref: 'AZURE_OPENAI_KEY',
+    input_price_per_1m: 0.15,
+    output_price_per_1m: 0.60,
+    max_output_tokens: 4096,
+    temperature: 0.0,
+    fallback_order: 2,
+    is_primary: false,
+    is_active: true,
+    monthly_budget_inr: 15000.0,
+    current_spend_inr: 3420.00,
+  },
+  {
+    id: 'ai_anthropic_claude',
+    provider_name: 'Anthropic Claude',
+    provider_key: 'ANTHROPIC',
+    model_name: 'claude-3-5-haiku-20241022',
+    endpoint_url: 'https://api.anthropic.com/v1',
+    api_key_ref: 'ANTHROPIC_API_KEY',
+    input_price_per_1m: 0.80,
+    output_price_per_1m: 4.00,
+    max_output_tokens: 4096,
+    temperature: 0.1,
+    fallback_order: 3,
+    is_primary: false,
+    is_active: true,
+    monthly_budget_inr: 25000.0,
+    current_spend_inr: 450.00,
+  },
+];
+
+export const SEED_PROMPT_TEMPLATES: PromptTemplateEntity[] = [
+  {
+    id: 'pt_sap_ecc_v1',
+    template_name: 'SAP ECC Enterprise Header & Item Extraction',
+    version: 1,
+    target_stream: 'STREAM_A_ITH_TRAVEL',
+    system_instruction: `You are a strict, enterprise invoice data extraction engine for SAP ECC accounting.
+Analyze the provided document image/text carefully. Extract key header fields and line items matching the exact JSON schema.
+Zero hallucination: if a field is not present in the document, return null. Return amounts as numbers without currency symbols.`,
+    user_prompt_pattern: `Extract invoice data conforming strictly to the requested schema. Document type: INVOICE. Base Currency: INR.`,
+    is_active: true,
+    updated_at: '2026-09-20T12:00:00Z',
+  },
+  {
+    id: 'pt_airline_gst_v1',
+    template_name: 'Airline Passenger Ticket & GSTIN Extraction',
+    version: 1,
+    target_stream: 'STREAM_B_AIRLINE_TAX_CREDIT',
+    system_instruction: `You are an airline passenger ticket and GST/VAT tax invoice parsing specialist.
+Extract airline name, airline GSTIN, customer GSTIN, PNR, e-ticket number, flight sector, base fare, CGST, SGST, IGST, and total invoice value.
+Ensure customer GSTIN is accurately captured for tax credit claim verification.`,
+    user_prompt_pattern: `Extract airline tax invoice details with PNR and GSTIN fields conforming to the schema.`,
+    is_active: true,
+    updated_at: '2026-09-22T14:30:00Z',
+  },
+];
+
 
 const INITIAL_FIELD_DEFINITIONS: FieldDefinition[] = [
   {
@@ -1042,6 +1177,22 @@ export function useInvoiceFlowStore() {
     return saved ? JSON.parse(saved) : SEED_AI_MODEL_PRICING;
   });
 
+  const [mailboxes, setMailboxes] = useState<MailboxConfigEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_mailboxes');
+    return saved ? JSON.parse(saved) : SEED_MAILBOXES;
+  });
+
+  const [aiProviders, setAiProviders] = useState<AiProviderConfigEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_ai_providers');
+    return saved ? JSON.parse(saved) : SEED_AI_PROVIDERS;
+  });
+
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplateEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_prompt_templates');
+    return saved ? JSON.parse(saved) : SEED_PROMPT_TEMPLATES;
+  });
+
+
   const [masterImportProfiles, setMasterImportProfiles] = useState<MasterImportProfileEntity[]>(() => {
     const saved = localStorage.getItem('invoiceflow_master_import_profiles');
     return saved ? JSON.parse(saved) : [
@@ -1206,6 +1357,18 @@ export function useInvoiceFlowStore() {
     localStorage.setItem('invoiceflow_process_logs', JSON.stringify(processLogs));
   }, [processLogs]);
 
+  useEffect(() => {
+    localStorage.setItem('invoiceflow_mailboxes', JSON.stringify(mailboxes));
+  }, [mailboxes]);
+
+  useEffect(() => {
+    localStorage.setItem('invoiceflow_ai_providers', JSON.stringify(aiProviders));
+  }, [aiProviders]);
+
+  useEffect(() => {
+    localStorage.setItem('invoiceflow_prompt_templates', JSON.stringify(promptTemplates));
+  }, [promptTemplates]);
+
   // Actions
   const addLog = (
     module: string,
@@ -1271,6 +1434,95 @@ export function useInvoiceFlowStore() {
     }
   };
 
+  // Mailbox Configuration CRUD
+  const addMailbox = (mbx: Omit<MailboxConfigEntity, 'id'>) => {
+    const id = `mbx_${Date.now()}`;
+    const full = { ...mbx, id };
+    setMailboxes((prev) => [...prev, full]);
+    addLog('MAILBOX', 'MAILBOX_CONFIG_CREATED', 'SUCCESS', `Registered mailbox configuration: ${full.name} (${full.email})`);
+    return full;
+  };
+
+  const updateMailbox = (updated: MailboxConfigEntity) => {
+    setMailboxes((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+    addLog('MAILBOX', 'MAILBOX_CONFIG_UPDATED', 'SUCCESS', `Updated mailbox configuration: ${updated.name} (${updated.email})`);
+  };
+
+  const deleteMailbox = (id: string) => {
+    const target = mailboxes.find((m) => m.id === id);
+    setMailboxes((prev) => prev.filter((m) => m.id !== id));
+    if (target) {
+      addLog('MAILBOX', 'MAILBOX_CONFIG_DELETED', 'WARNING', `Deleted mailbox configuration: ${target.name} (${target.email})`);
+    }
+  };
+
+  // AI Provider & Model Configuration CRUD
+  const addAiProvider = (provider: Omit<AiProviderConfigEntity, 'id'>) => {
+    const id = `ai_${Date.now()}`;
+    const full = { ...provider, id };
+    setAiProviders((prev) => [...prev, full]);
+    addLog('AI_ENGINE', 'AI_PROVIDER_CREATED', 'SUCCESS', `Configured AI Provider: ${full.provider_name} (${full.model_name})`);
+    return full;
+  };
+
+  const updateAiProvider = (updated: AiProviderConfigEntity) => {
+    setAiProviders((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    addLog('AI_ENGINE', 'AI_PROVIDER_UPDATED', 'SUCCESS', `Updated AI Provider: ${updated.provider_name} (${updated.model_name})`);
+  };
+
+  const deleteAiProvider = (id: string) => {
+    const target = aiProviders.find((p) => p.id === id);
+    setAiProviders((prev) => prev.filter((p) => p.id !== id));
+    if (target) {
+      addLog('AI_ENGINE', 'AI_PROVIDER_DELETED', 'WARNING', `Deleted AI Provider: ${target.provider_name} (${target.model_name})`);
+    }
+  };
+
+  // Prompt Template CRUD
+  const addPromptTemplate = (tmpl: Omit<PromptTemplateEntity, 'id'>) => {
+    const id = `pt_${Date.now()}`;
+    const full = { ...tmpl, id };
+    setPromptTemplates((prev) => [...prev, full]);
+    addLog('AI_ENGINE', 'PROMPT_TEMPLATE_CREATED', 'SUCCESS', `Created Prompt Template: ${full.template_name} v${full.version}`);
+    return full;
+  };
+
+  const updatePromptTemplate = (updated: PromptTemplateEntity) => {
+    setPromptTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    addLog('AI_ENGINE', 'PROMPT_TEMPLATE_UPDATED', 'SUCCESS', `Updated Prompt Template: ${updated.template_name} v${updated.version}`);
+  };
+
+  const deletePromptTemplate = (id: string) => {
+    const target = promptTemplates.find((t) => t.id === id);
+    setPromptTemplates((prev) => prev.filter((t) => t.id !== id));
+    if (target) {
+      addLog('AI_ENGINE', 'PROMPT_TEMPLATE_DELETED', 'WARNING', `Deleted Prompt Template: ${target.template_name} v${target.version}`);
+    }
+  };
+
+  // Stream CRUD
+  const addStream = (stream: Omit<ProcessingStreamEntity, 'id'>) => {
+    const id = `stream_${Date.now()}`;
+    const full = { ...stream, id };
+    setStreams((prev) => [...prev, full]);
+    addLog('STREAMS', 'STREAM_CREATED', 'SUCCESS', `Registered processing stream: ${full.stream_name} (${full.stream_code})`);
+    return full;
+  };
+
+  const updateStream = (updated: ProcessingStreamEntity) => {
+    setStreams((prev) => prev.map((s) => (s.stream_code === updated.stream_code ? updated : s)));
+    addLog('STREAMS', 'STREAM_UPDATED', 'SUCCESS', `Updated processing stream: ${updated.stream_name} (${updated.stream_code})`);
+  };
+
+  const deleteStream = (stream_code: string) => {
+    const target = streams.find((s) => s.stream_code === stream_code);
+    setStreams((prev) => prev.filter((s) => s.stream_code !== stream_code));
+    if (target) {
+      addLog('STREAMS', 'STREAM_DELETED', 'WARNING', `Deleted processing stream: ${target.stream_name} (${stream_code})`);
+    }
+  };
+
+
   return {
     fields,
     setFields,
@@ -1325,11 +1577,33 @@ export function useInvoiceFlowStore() {
 
     streams,
     setStreams,
+    addStream,
+    updateStream,
+    deleteStream,
 
     subcategories,
     setSubcategories,
 
+    mailboxes,
+    setMailboxes,
+    addMailbox,
+    updateMailbox,
+    deleteMailbox,
+
+    aiProviders,
+    setAiProviders,
+    addAiProvider,
+    updateAiProvider,
+    deleteAiProvider,
+
+    promptTemplates,
+    setPromptTemplates,
+    addPromptTemplate,
+    updatePromptTemplate,
+    deletePromptTemplate,
+
     taxRegimes,
+
     setTaxRegimes,
 
     profitCenters,

@@ -495,11 +495,19 @@ def main():
     p_worker = subparsers.add_parser("serve-worker", help="Run headless console worker for scheduled email ingestion & return dispatch")
     p_worker.add_argument("--cadence-minutes", type=int, default=60, help="Scheduler cadence in minutes (default 60 for hourly runs)")
     p_worker.add_argument("--stream", help="Specific processing stream to filter (default all active)")
+    p_worker.add_argument("--mailbox", help="Target mailbox address to process (e.g. travel.invoices@snpl.com.np)")
+    p_worker.add_argument("--spool-dir", default="/data/inbox_spool", help="Filesystem spool directory for local mailbox ingestion")
+    p_worker.add_argument("--output-dir", default="/data/processed_artifacts", help="Directory where SAP batch files and MIS packages are written")
+    p_worker.add_argument("--max-runs", type=int, help="Maximum scheduler cycles to execute before terminating (useful for tests)")
     p_worker.add_argument("--once", action="store_true", help="Execute single scheduler cycle and exit")
 
     # run-once (Execute single batch run and exit)
     p_ro = subparsers.add_parser("run-once", help="Execute single invoice processing run across streams and exit")
     p_ro.add_argument("--stream", help="Stream code (e.g. STREAM_A_ITH_TRAVEL or STREAM_B_AIRLINE_TAX_CREDIT)")
+    p_ro.add_argument("--mailbox", help="Target mailbox to pull incoming messages from")
+    p_ro.add_argument("--file", help="Specific invoice file (PDF/JSON/TXT) to ingest directly")
+    p_ro.add_argument("--spool-dir", default="/data/inbox_spool", help="Filesystem spool directory")
+    p_ro.add_argument("--output-dir", default="/data/processed_artifacts", help="Output directory for generated SAP upload batch & MIS files")
     p_ro.add_argument("--generate-mis-zip", action="store_true", default=True, help="Generate comprehensive MIS package ZIP")
 
     # eval (Accuracy Evaluation Harness)
@@ -527,20 +535,30 @@ def main():
         from app.workers.headless_worker import HeadlessWorkerEngine
         engine = HeadlessWorkerEngine(
             cadence_minutes=getattr(args, "cadence_minutes", 60),
-            stream_filter=getattr(args, "stream", None)
+            stream_filter=getattr(args, "stream", None),
+            target_mailbox=getattr(args, "mailbox", None),
+            spool_dir=getattr(args, "spool_dir", "/data/inbox_spool"),
+            output_dir=getattr(args, "output_dir", "/data/processed_artifacts")
         )
         if getattr(args, "once", False):
-            engine.run_single_batch()
+            await engine.run_single_batch_async()
         else:
-            await engine.start_scheduler()
+            await engine.start_scheduler(max_runs=getattr(args, "max_runs", None))
 
     async def cmd_run_once(args):
         from app.workers.headless_worker import HeadlessWorkerEngine
         engine = HeadlessWorkerEngine(
             cadence_minutes=60,
-            stream_filter=getattr(args, "stream", None)
+            stream_filter=getattr(args, "stream", None),
+            target_mailbox=getattr(args, "mailbox", None),
+            spool_dir=getattr(args, "spool_dir", "/data/inbox_spool"),
+            output_dir=getattr(args, "output_dir", "/data/processed_artifacts")
         )
-        engine.run_single_batch()
+        await engine.run_single_batch_async(
+            specific_file=getattr(args, "file", None),
+            generate_zip=getattr(args, "generate_mis_zip", True)
+        )
+
 
 
     async def cmd_eval(args):

@@ -20,12 +20,14 @@ export const ExportProfileDesigner: React.FC = () => {
   });
 
   const [isAdding, setIsAdding] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
   const handleSaveColumns = () => {
     const updated = { ...exportProfile, columns };
     setExportProfile(updated);
     addLog('EXPORT_ENGINE', 'PROFILE_COLUMNS_SAVED', 'SUCCESS', `Export profile layout columns updated (${columns.length} columns)`);
-    alert('SAP ECC Export layout saved.');
+    setSaveSuccessMsg(true);
+    setTimeout(() => setSaveSuccessMsg(false), 3000);
   };
 
   const handleAddColumn = () => {
@@ -70,6 +72,11 @@ export const ExportProfileDesigner: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {saveSuccessMsg && (
+            <span className="text-xs text-emerald-400 font-medium px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded flex items-center gap-1.5">
+              Layout configuration saved!
+            </span>
+          )}
           <button
             onClick={() => setIsAdding(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-300 bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 rounded transition-colors"

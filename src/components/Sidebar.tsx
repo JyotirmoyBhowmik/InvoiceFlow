@@ -30,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
       items: [
         { id: 'dashboard', label: 'Dashboard & Metrics', icon: LayoutDashboard },
         { id: 'workbench', label: 'Review & Correction', icon: FileCheck2 },
+        { id: 'streams', label: 'Processing Streams (A & B)', icon: Layers },
         { id: 'runs', label: 'SAP ECC Export Runs', icon: FileSpreadsheet },
       ],
     },

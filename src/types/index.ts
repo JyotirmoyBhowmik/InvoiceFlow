@@ -111,6 +111,7 @@ export interface DocumentRecord {
   converted_total_inr?: number;
   converted_tax_inr?: number;
   document_date: string;
+  posting_date?: string;
   document_artifact_id: string;
   document_artifact_sha256: string;
   document_artifact_uri: string;
@@ -605,6 +606,52 @@ export interface StreamDetectionResult {
   mandatory_fields: string[];
   applicable_rules: string[];
   return_email_template_key: string;
+}
+
+export interface MailboxConfigEntity {
+  id: string;
+  name: string;
+  email: string;
+  protocol: 'GRAPH' | 'IMAP' | 'EWS' | 'LOCAL_SPOOL';
+  scope: string;
+  stream_code: string;
+  tenant: string;
+  client_id?: string;
+  polling_interval_mins: number;
+  status: 'MONITORING' | 'PAUSED' | 'ERROR';
+  unread_count: number;
+  folder_name?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AiProviderConfigEntity {
+  id: string;
+  provider_name: string;
+  provider_key: 'GEMINI' | 'AZURE_OPENAI' | 'ANTHROPIC' | 'AWS_BEDROCK' | 'LOCAL';
+  model_name: string;
+  endpoint_url: string;
+  api_key_ref: string;
+  input_price_per_1m: number;
+  output_price_per_1m: number;
+  max_output_tokens: number;
+  temperature: number;
+  fallback_order: number;
+  is_primary: boolean;
+  is_active: boolean;
+  monthly_budget_inr: number;
+  current_spend_inr: number;
+}
+
+export interface PromptTemplateEntity {
+  id: string;
+  template_name: string;
+  version: number;
+  target_stream?: string;
+  system_instruction: string;
+  user_prompt_pattern: string;
+  is_active: boolean;
+  updated_at: string;
 }
 
 

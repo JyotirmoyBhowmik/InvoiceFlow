@@ -15,6 +15,7 @@ import { LogConsole } from './components/LogConsole';
 import { ErrorCatalogManager } from './components/ErrorCatalogManager';
 import { ThemeStudio } from './components/ThemeStudio';
 import { SystemSettings } from './components/SystemSettings';
+import { ProcessingStreamsManager } from './components/ProcessingStreamsManager';
 import { IngestModal } from './components/IngestModal';
 import { AuthModal } from './components/AuthModal';
 import { useInvoiceFlowStore } from './store/useInvoiceFlowStore';
@@ -139,6 +140,8 @@ export default function App() {
             )}
 
             {currentTab === 'runs' && <RunManager />}
+
+            {currentTab === 'streams' && <ProcessingStreamsManager />}
 
             {currentTab === 'fields' && <FieldDefinitionManager />}
 

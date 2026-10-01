@@ -190,7 +190,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onClose, onSelectTab }
                 ) : (
                   <button
                     onClick={() => {
-                      alert('Setup complete! All 13 enterprise pipeline stages verified.');
                       onClose();
                     }}
                     className="px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
