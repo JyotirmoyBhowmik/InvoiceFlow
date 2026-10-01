@@ -134,6 +134,12 @@ export interface DocumentRecord {
   business_place?: string;
   section_code?: string;
   review_reason?: string;
+  stream_code?: 'STREAM_A_ITH_TRAVEL' | 'STREAM_B_AIRLINE_TAX_CREDIT' | string;
+  subcategory?: 'HOTEL' | 'AIRLINE' | 'TRAIN' | 'CAB' | 'ITH_CONSOLIDATED' | 'GENERAL' | string;
+  stream_detection_confidence?: number;
+  stream_detection_method?: 'MAILBOX_RULE' | 'SENDER_MATCH' | 'SUBJECT_MATCH' | 'AI_CLASSIFICATION' | 'CONTENT_HEURISTIC' | 'MANUAL_OVERRIDE';
+  stream_detection_details?: string;
+  return_email_preview?: ReturnEmailPreview;
   fields: Record<string, ExtractedField>;
   line_items: InvoiceLineItem[];
   sample_image_url?: string;
@@ -546,4 +552,59 @@ export interface AiModelPricingEntity {
   inr_to_npr_rate: number;
   is_active: boolean;
 }
+
+export interface ReturnEmailPreview {
+  template_key: string;
+  template_name: string;
+  outcome_status: 'SUCCESS_STP' | 'EXCEPTION_REVIEW' | 'REJECTED';
+  recipient_email: string;
+  reply_to_mode: string;
+  email_subject: string;
+  email_body_html: string;
+  email_body_text: string;
+  attached_sap_file?: string;
+  attached_mis_package?: string;
+  generated_at: string;
+}
+
+export interface NotificationTemplateEntity {
+  id: string;
+  template_key: string;
+  stream_code?: string;
+  template_name: string;
+  outcome_status: 'SUCCESS_STP' | 'EXCEPTION_REVIEW' | 'REJECTED' | 'GENERAL';
+  subject_template: string;
+  body_html_template: string;
+  body_text_template: string;
+  include_sap_file: boolean;
+  include_mis_package: boolean;
+  is_active: boolean;
+}
+
+export interface StreamValidationRuleEntity {
+  id: string;
+  rule_code: string;
+  stream_code: string;
+  subcategory_code?: string;
+  rule_name: string;
+  rule_type: 'MANDATORY_FIELD' | 'ARITHMETIC' | 'MASTER_MATCH' | 'TAX_DETERMINATION' | 'TRIP_REFERENCE' | 'DOUBLE_CLAIM' | 'FORMAT';
+  severity: 'INFO' | 'WARN' | 'ERROR' | 'BLOCK';
+  error_code: string;
+  error_message_template: string;
+  remediation_hint: string;
+  is_active: boolean;
+}
+
+export interface StreamDetectionResult {
+  stream_code: 'STREAM_A_ITH_TRAVEL' | 'STREAM_B_AIRLINE_TAX_CREDIT' | string;
+  stream_name: string;
+  subcategory: 'HOTEL' | 'AIRLINE' | 'TRAIN' | 'CAB' | 'ITH_CONSOLIDATED' | 'GENERAL' | string;
+  confidence: number;
+  detection_method: 'MAILBOX_RULE' | 'SENDER_MATCH' | 'SUBJECT_MATCH' | 'AI_CLASSIFICATION' | 'CONTENT_HEURISTIC' | 'MANUAL_OVERRIDE';
+  detection_details: string;
+  mandatory_fields: string[];
+  applicable_rules: string[];
+  return_email_template_key: string;
+}
+
 

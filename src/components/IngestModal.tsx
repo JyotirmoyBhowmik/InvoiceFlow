@@ -11,10 +11,18 @@ import {
   Lock,
   Layers,
   FileCheck,
+  GitBranch,
+  Mail,
+  Building2,
+  Plane,
+  ChevronRight,
+  Info,
+  Check,
 } from 'lucide-react';
 import { useInvoiceFlowStore } from '../store/useInvoiceFlowStore';
 import { DocumentRecord, ExtractedField, InvoiceLineItem, ValidationError } from '../types';
 import { getExchangeRateToINR, convertToINR } from '../utils/currency';
+import { identifyDocumentStream, StreamDetectionResult } from '../server/streamEngine';
 
 interface IngestModalProps {
   isOpen: boolean;
@@ -31,6 +39,8 @@ export const IngestModal: React.FC<IngestModalProps> = ({ isOpen, onClose, onSuc
   const [isProcessing, setIsProcessing] = useState(false);
   const [stepMessage, setStepMessage] = useState('');
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [targetMailbox, setTargetMailbox] = useState<string>('travel.invoices@snpl.com.np');
+  const [selectedStreamMode, setSelectedStreamMode] = useState<'AUTO' | 'STREAM_A_ITH_TRAVEL' | 'STREAM_B_AIRLINE_TAX_CREDIT'>('AUTO');
 
   if (!isOpen) return null;
 
@@ -55,6 +65,7 @@ export const IngestModal: React.FC<IngestModalProps> = ({ isOpen, onClose, onSuc
     let content = '';
 
     if (sampleType === 'ith_travel') {
+      setTargetMailbox('travel.invoices@snpl.com.np');
       filename = 'ITH_Travel_Consolidated_INV-2026-9410.pdf';
       content = `%PDF-1.4
 %âãÏÓ
@@ -85,6 +96,7 @@ Total Cost (Gross): 31207.50 INR (₹31,207.50)
 Payment Terms: Net 30 Days
 %%EOF`;
     } else if (sampleType === 'airline_gst') {
+      setTargetMailbox('airline.gst@snpl.com.np');
       filename = 'IndiGo_Airlines_GST_Credit_6E-W8Q29.pdf';
       content = `%PDF-1.4
 %âãÏÓ
@@ -293,6 +305,7 @@ Gross Total: 3808.00 EUR
       let aiResponseData: any = null;
       let rawText = '';
       let extractionModel = 'gemini-3.1-flash-lite';
+      let serverStreamAnalysis: StreamDetectionResult | null = null;
 
       try {
         const response = await fetch('/api/extract-invoice', {
@@ -302,6 +315,10 @@ Gross Total: 3808.00 EUR
             fileBase64: resolvedDataUrl,
             mimeType: selectedFile.type || (selectedFile.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
             filename: selectedFile.name,
+            mailbox: targetMailbox,
+            subject: selectedFile.name,
+            sender: targetMailbox.includes('airline') ? 'billing@indigo.in' : 'traveldesk@snpl.com.np',
+            targetStream: selectedStreamMode !== 'AUTO' ? selectedStreamMode : undefined,
           }),
         });
 
@@ -311,6 +328,7 @@ Gross Total: 3808.00 EUR
             aiResponseData = json.data;
             rawText = json.data.raw_text || '';
             extractionModel = json.source || 'gemini-3.1-flash-lite';
+            serverStreamAnalysis = json.stream_metadata || null;
           }
         }
       } catch (apiErr) {
@@ -797,6 +815,53 @@ Gross Total: 3808.00 EUR
       const convertedTotal = convertToINR(extractedTotal || 0, docCurrency, exchangeRate);
       const convertedTax = convertToINR(extractedTax || 0, docCurrency, exchangeRate);
 
+      // 5. Document-Level Stream Identification & Rules Evaluation
+      const streamAnalysis: StreamDetectionResult = serverStreamAnalysis || identifyDocumentStream({
+        filename: selectedFile.name,
+        rawText,
+        mailbox: targetMailbox,
+        subject: selectedFile.name,
+        sender: targetMailbox.includes('airline') ? 'billing@indigo.in' : 'traveldesk@snpl.com.np',
+        extractedData: {
+          ...aiResponseData,
+          invoice_number: extractedInvNum,
+          invoice_date: extractedDate,
+          vendor_name: finalVendorName,
+          vendor_tax_id: finalVendorTaxId,
+          total_cost: extractedTotal,
+          tax_amount: extractedTax,
+          taxable_value: extractedTaxable,
+          currency: docCurrency,
+          trip_id: fieldsMap['trip_id']?.normalized_value,
+          pnr_number: fieldsMap['pnr_ticket']?.normalized_value,
+          booking_type: fieldsMap['booking_type']?.normalized_value,
+          gst_claim_status: fieldsMap['gst_claim_status']?.normalized_value,
+        },
+      });
+
+      if (selectedStreamMode !== 'AUTO') {
+        streamAnalysis.stream_code = selectedStreamMode;
+        streamAnalysis.detection_method = 'MANUAL_OVERRIDE';
+        streamAnalysis.confidence = 100.0;
+        streamAnalysis.detection_details = `User specified stream override: ${selectedStreamMode}`;
+      }
+
+      // Merge stream validation errors into document validation errors
+      if (streamAnalysis.validation_errors && streamAnalysis.validation_errors.length > 0) {
+        for (const sErr of streamAnalysis.validation_errors) {
+          if (!validationErrors.some((ve) => ve.error_code === sErr.error_code)) {
+            validationErrors.push({
+              id: `err_stream_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              error_code: sErr.error_code,
+              field_key: sErr.field_key,
+              severity: sErr.severity,
+              message: sErr.message,
+              is_resolved: false,
+            });
+          }
+        }
+      }
+
       // Assemble document record STRICTLY LINKED to source artifact
       const newDocument: DocumentRecord = {
         id: docId,
@@ -832,6 +897,12 @@ Gross Total: 3808.00 EUR
         gst_claim_status: (fieldsMap['gst_claim_status']?.normalized_value as any) || undefined,
         business_place: fieldsMap['business_place']?.normalized_value || undefined,
         section_code: fieldsMap['section_code']?.normalized_value || undefined,
+        stream_code: streamAnalysis.stream_code,
+        subcategory: streamAnalysis.subcategory,
+        stream_detection_confidence: streamAnalysis.confidence,
+        stream_detection_method: streamAnalysis.detection_method,
+        stream_detection_details: streamAnalysis.detection_details,
+        return_email_preview: streamAnalysis.return_email_preview,
         fields: fieldsMap,
         line_items: parsedLineItems,
         sample_image_url: resolvedDataUrl || filePreviewUrl || undefined,
@@ -885,6 +956,59 @@ Gross Total: 3808.00 EUR
             <span>
               InvoiceFlow never allows manual document creation or invented numbers. A document record is <em>only</em> created from binary file bytes. Values not found in the file are marked as <code>NOT_FOUND</code>.
             </span>
+          </div>
+        </div>
+
+        {/* Stream Ingestion & Mailbox Channel Configuration */}
+        <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-lg space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs text-neutral-300 font-semibold">
+              <GitBranch className="w-3.5 h-3.5 text-blue-400" />
+              <span>Multi-Stream Ingestion Channel &amp; Mailbox Routing</span>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              Part A &amp; B Architecture
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div>
+              <label className="text-[10px] uppercase font-mono text-neutral-400 block mb-1 flex items-center gap-1">
+                <Mail className="w-3 h-3 text-neutral-400" /> Ingestion Mailbox
+              </label>
+              <select
+                value={targetMailbox}
+                onChange={(e) => setTargetMailbox(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+              >
+                <option value="travel.invoices@snpl.com.np">travel.invoices@snpl.com.np (Stream A: Travel/ITH)</option>
+                <option value="airline.gst@snpl.com.np">airline.gst@snpl.com.np (Stream B: Airline Tax Credit)</option>
+                <option value="ap.invoices@enterprise.internal">ap.invoices@enterprise.internal (Direct AP Routing)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-mono text-neutral-400 block mb-1 flex items-center gap-1">
+                <GitBranch className="w-3 h-3 text-neutral-400" /> Stream Classification
+              </label>
+              <select
+                value={selectedStreamMode}
+                onChange={(e) => setSelectedStreamMode(e.target.value as any)}
+                className="w-full px-2.5 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+              >
+                <option value="AUTO">Auto-Detect via Content &amp; Header</option>
+                <option value="STREAM_A_ITH_TRAVEL">Force Stream A (Travel / ITH Payment)</option>
+                <option value="STREAM_B_AIRLINE_TAX_CREDIT">Force Stream B (Airline Tax Credit Claim)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-0.5 text-[11px] text-neutral-400">
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Check className="w-3 h-3" /> Auto Return-Email Enabled
+            </span>
+            <span className="text-neutral-600">&middot;</span>
+            <span>Generates SAP ECC file + MIS package ZIP in reply</span>
           </div>
         </div>
 

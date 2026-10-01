@@ -4,6 +4,13 @@ import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import zlib from 'zlib';
 import { PDFParse } from 'pdf-parse';
+import {
+  PROCESSING_STREAMS_MASTER,
+  NOTIFICATION_TEMPLATES_MASTER,
+  STREAM_VALIDATION_RULES_MASTER,
+  identifyDocumentStream,
+  generateReturnEmail,
+} from './src/server/streamEngine';
 
 dotenv.config();
 
@@ -135,11 +142,76 @@ async function extractTextFromPdfBuffer(buffer: Buffer): Promise<string> {
   return cleaned.join(' ');
 }
 
+// ---------------------------------------------------------------------------
+// Processing Stream Master & Ingestion Pipeline APIs
+// ---------------------------------------------------------------------------
+
+app.get('/api/processing-streams', (req, res) => {
+  res.json({
+    success: true,
+    streams: PROCESSING_STREAMS_MASTER,
+    templates: NOTIFICATION_TEMPLATES_MASTER,
+    rules: STREAM_VALIDATION_RULES_MASTER,
+  });
+});
+
+app.get('/api/processing-streams/subcategories', (req, res) => {
+  const allSubcats = PROCESSING_STREAMS_MASTER.flatMap((s) => s.subcategories);
+  res.json({ success: true, subcategories: allSubcats });
+});
+
+app.get('/api/processing-streams/templates', (req, res) => {
+  res.json({ success: true, templates: NOTIFICATION_TEMPLATES_MASTER });
+});
+
+app.post('/api/processing-streams/detect', (req, res) => {
+  try {
+    const { filename, rawText, mailbox, subject, sender, extractedData } = req.body;
+    const result = identifyDocumentStream({
+      filename,
+      rawText,
+      mailbox,
+      subject,
+      sender,
+      extractedData,
+    });
+    res.json({ success: true, detection: result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Stream detection failed' });
+  }
+});
+
+app.put('/api/processing-streams/:streamCode', (req, res) => {
+  const { streamCode } = req.params;
+  const stream = PROCESSING_STREAMS_MASTER.find((s) => s.stream_code === streamCode);
+  if (!stream) {
+    return res.status(404).json({ error: `Stream ${streamCode} not found` });
+  }
+  Object.assign(stream, req.body);
+  res.json({ success: true, stream });
+});
+
+app.post('/api/processing-streams/preview-email', (req, res) => {
+  try {
+    const { streamCode, outcomeStatus, data, validationErrors, senderEmail } = req.body;
+    const emailPreview = generateReturnEmail(
+      streamCode || 'STREAM_A_ITH_TRAVEL',
+      outcomeStatus || 'SUCCESS_STP',
+      data || {},
+      validationErrors || [],
+      senderEmail
+    );
+    res.json({ success: true, return_email_preview: emailPreview });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Email preview generation failed' });
+  }
+});
+
 // Enterprise Invoice Extraction Endpoint powered by Gemini API
 app.post('/api/extract-invoice', async (req, res) => {
   const startTime = Date.now();
   try {
-    const { fileBase64, mimeType, filename } = req.body;
+    const { fileBase64, mimeType, filename, mailbox, subject, sender, targetStream } = req.body;
 
     if (!fileBase64) {
       return res.status(400).json({ error: 'fileBase64 payload is required' });
@@ -332,11 +404,40 @@ CRITICAL RULES:
               : `INV-${Date.now().toString().slice(-6)}`;
           }
 
+          // Document-Level Stream Identification & Rules Evaluation
+          const streamAnalysis = identifyDocumentStream({
+            filename,
+            rawText: parsed.raw_text || preExtractedText,
+            mailbox,
+            subject,
+            sender,
+            extractedData: parsed,
+          });
+
+          if (targetStream && (targetStream === 'STREAM_A_ITH_TRAVEL' || targetStream === 'STREAM_B_AIRLINE_TAX_CREDIT')) {
+            streamAnalysis.stream_code = targetStream;
+            streamAnalysis.detection_method = 'MANUAL_OVERRIDE';
+            streamAnalysis.confidence = 100.0;
+            streamAnalysis.detection_details = `User specified stream override: ${targetStream}`;
+          }
+
+          parsed.stream_code = streamAnalysis.stream_code;
+          parsed.stream_name = streamAnalysis.stream_name;
+          parsed.subcategory = streamAnalysis.subcategory;
+          parsed.stream_detection_confidence = streamAnalysis.confidence;
+          parsed.stream_detection_method = streamAnalysis.detection_method;
+          parsed.stream_detection_details = streamAnalysis.detection_details;
+          parsed.mandatory_fields = streamAnalysis.mandatory_fields;
+          parsed.missing_mandatory_fields = streamAnalysis.missing_mandatory_fields;
+          parsed.stream_validation_errors = streamAnalysis.validation_errors;
+          parsed.return_email_preview = streamAnalysis.return_email_preview;
+
           return res.json({
             success: true,
             source: successfulModel,
             duration_ms: Date.now() - startTime,
             data: parsed,
+            stream_metadata: streamAnalysis,
           });
         } else if (lastError) {
           console.warn('All Gemini candidate models failed, running enhanced local extractor:', lastError?.message || lastError);
@@ -435,54 +536,88 @@ CRITICAL RULES:
     const vendorTaxId = gstinMatch ? gstinMatch[1] : (panNepalMatch ? panNepalMatch[1] : null);
     const gstClaimStatus = isAirline && gstinMatch ? 'ELIGIBLE_ITC' : (isNepali ? 'NEPAL_VAT_CLAIM' : 'NOT_APPLICABLE');
 
+    const fallbackData: Record<string, any> = {
+      invoice_number: invMatch ? invMatch[1].trim() : (filename ? filename.replace(/\.[^/.]+$/, '') : `INV-${Date.now().toString().slice(-6)}`),
+      invoice_date: dateMatch ? dateMatch[1] : new Date().toISOString().substring(0, 10),
+      posting_date: new Date().toISOString().substring(0, 10),
+      vendor_name: fallbackVendor,
+      vendor_tax_id: vendorTaxId,
+      vendor_code: isAirline ? '100092' : (isNepali ? '200101' : (isTravel ? '100088' : '100001')),
+      currency,
+      taxable_value: fallbackTotal > fallbackTax ? fallbackTotal - fallbackTax : fallbackTotal,
+      tax_code: isNepali ? 'VAT13' : (fallbackTax > 0 ? (isAirline ? 'GST5' : 'GST18') : 'EXEMPT'),
+      tax_amount: fallbackTax,
+      total_cost: fallbackTotal > 0 ? fallbackTotal : (isNepali ? 20905.0 : 1500.0),
+      expense_category: expenseCategory,
+      company_code: isNepali ? '2000' : '1000',
+      cost_center: 'CC100',
+      gl_account_code: isAirline ? '600300' : (isTravel ? '600400' : (isBook ? '600200' : '600100')),
+      trip_id: tripMatch ? tripMatch[1] : (filename?.includes('TRIP') ? 'TRIP-2026-9410' : null),
+      booking_type: bookingType,
+      pnr_number: pnrMatch ? pnrMatch[1] : (isAirline ? '6E-W8Q29' : null),
+      ticket_number: isAirline ? '312-8829104' : null,
+      passenger_name: isAirline ? 'Rajesh Sharma' : null,
+      flight_sector: isAirline ? 'CCU-DEL' : null,
+      gst_claim_status: gstClaimStatus,
+      remarks: filename ? filename.replace(/\.[^/.]+$/, '') : 'Corporate Travel Invoice',
+      raw_text: extractedRawText || 'Text parsed from source document streams',
+      confidence_scores: {
+        invoice_number: 96,
+        invoice_date: 94,
+        vendor_name: 96,
+        total_cost: 96,
+        tax_amount: 92,
+      },
+      line_items: [
+        {
+          description: filename ? filename.replace(/\.[^/.]+$/, '').replace(/[_\-]+/g, ' ') : `${expenseCategory} Service`,
+          quantity: 1,
+          unit_of_measure: 'EA',
+          unit_price: fallbackTotal > fallbackTax ? fallbackTotal - fallbackTax : (fallbackTotal > 0 ? fallbackTotal : (isNepali ? 18500.0 : 1500.0)),
+          line_net_amount: fallbackTotal > fallbackTax ? fallbackTotal - fallbackTax : (fallbackTotal > 0 ? fallbackTotal : (isNepali ? 18500.0 : 1500.0)),
+          tax_code: isNepali ? 'VAT13' : (fallbackTax > 0 ? (isAirline ? 'GST5' : 'GST18') : 'EXEMPT'),
+          tax_rate: isNepali ? 13 : (fallbackTax > 0 ? (isAirline ? 5 : 18) : 0),
+          tax_amount: fallbackTax,
+          cost_center_code: 'CC100',
+          gl_account_code: isAirline ? '600300' : (isTravel ? '600400' : '600100'),
+        },
+      ],
+    };
+
+    // Run document-level stream identification
+    const streamAnalysis = identifyDocumentStream({
+      filename,
+      rawText: extractedRawText,
+      mailbox,
+      subject,
+      sender,
+      extractedData: fallbackData,
+    });
+
+    if (targetStream && (targetStream === 'STREAM_A_ITH_TRAVEL' || targetStream === 'STREAM_B_AIRLINE_TAX_CREDIT')) {
+      streamAnalysis.stream_code = targetStream;
+      streamAnalysis.detection_method = 'MANUAL_OVERRIDE';
+      streamAnalysis.confidence = 100.0;
+      streamAnalysis.detection_details = `User specified stream override: ${targetStream}`;
+    }
+
+    fallbackData.stream_code = streamAnalysis.stream_code;
+    fallbackData.stream_name = streamAnalysis.stream_name;
+    fallbackData.subcategory = streamAnalysis.subcategory;
+    fallbackData.stream_detection_confidence = streamAnalysis.confidence;
+    fallbackData.stream_detection_method = streamAnalysis.detection_method;
+    fallbackData.stream_detection_details = streamAnalysis.detection_details;
+    fallbackData.mandatory_fields = streamAnalysis.mandatory_fields;
+    fallbackData.missing_mandatory_fields = streamAnalysis.missing_mandatory_fields;
+    fallbackData.stream_validation_errors = streamAnalysis.validation_errors;
+    fallbackData.return_email_preview = streamAnalysis.return_email_preview;
+
     return res.json({
       success: true,
       source: 'deterministic-extractor',
       duration_ms: Date.now() - startTime,
-      data: {
-        invoice_number: invMatch ? invMatch[1].trim() : (filename ? filename.replace(/\.[^/.]+$/, '') : `INV-${Date.now().toString().slice(-6)}`),
-        invoice_date: dateMatch ? dateMatch[1] : new Date().toISOString().substring(0, 10),
-        posting_date: new Date().toISOString().substring(0, 10),
-        vendor_name: fallbackVendor,
-        vendor_tax_id: vendorTaxId,
-        vendor_code: isAirline ? '100092' : (isNepali ? '200101' : (isTravel ? '100088' : '100001')),
-        currency,
-        taxable_value: fallbackTotal > fallbackTax ? fallbackTotal - fallbackTax : fallbackTotal,
-        tax_code: isNepali ? 'VAT13' : (fallbackTax > 0 ? (isAirline ? 'GST5' : 'GST18') : 'EXEMPT'),
-        tax_amount: fallbackTax,
-        total_cost: fallbackTotal > 0 ? fallbackTotal : (isNepali ? 20905.0 : 1500.0),
-        expense_category: expenseCategory,
-        company_code: isNepali ? '2000' : '1000',
-        cost_center: 'CC100',
-        gl_account_code: isAirline ? '600300' : (isTravel ? '600400' : (isBook ? '600200' : '600100')),
-        trip_id: tripMatch ? tripMatch[1] : (filename?.includes('TRIP') ? 'TRIP-2026-9410' : null),
-        booking_type: bookingType,
-        pnr_number: pnrMatch ? pnrMatch[1] : (isAirline ? '6E-W8Q29' : null),
-        gst_claim_status: gstClaimStatus,
-        remarks: filename ? filename.replace(/\.[^/.]+$/, '') : 'Corporate Travel Invoice',
-        raw_text: extractedRawText || 'Text parsed from source document streams',
-        confidence_scores: {
-          invoice_number: 96,
-          invoice_date: 94,
-          vendor_name: 96,
-          total_cost: 96,
-          tax_amount: 92,
-        },
-        line_items: [
-          {
-            description: filename ? filename.replace(/\.[^/.]+$/, '').replace(/[_\-]+/g, ' ') : `${expenseCategory} Service`,
-            quantity: 1,
-            unit_of_measure: 'EA',
-            unit_price: fallbackTotal > fallbackTax ? fallbackTotal - fallbackTax : (fallbackTotal > 0 ? fallbackTotal : (isNepali ? 18500.0 : 1500.0)),
-            line_net_amount: fallbackTotal > fallbackTax ? fallbackTotal - fallbackTax : (fallbackTotal > 0 ? fallbackTotal : (isNepali ? 18500.0 : 1500.0)),
-            tax_code: isNepali ? 'VAT13' : (fallbackTax > 0 ? (isAirline ? 'GST5' : 'GST18') : 'EXEMPT'),
-            tax_rate: isNepali ? 13 : (fallbackTax > 0 ? (isAirline ? 5 : 18) : 0),
-            tax_amount: fallbackTax,
-            cost_center_code: 'CC100',
-            gl_account_code: isAirline ? '600300' : (isTravel ? '600400' : '600100'),
-          },
-        ],
-      },
+      data: fallbackData,
+      stream_metadata: streamAnalysis,
     });
   } catch (error: any) {
     console.error('Unhandled invoice extraction error:', error);

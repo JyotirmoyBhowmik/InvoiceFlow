@@ -20,6 +20,11 @@ import {
   Eye,
   ArrowRightLeft,
   Download,
+  Mail,
+  Building2,
+  Plane,
+  GitBranch,
+  Inbox,
 } from 'lucide-react';
 import { useInvoiceFlowStore } from '../store/useInvoiceFlowStore';
 import { DocumentRecord, ExtractedField } from '../types';
@@ -236,7 +241,9 @@ export const Workbench: React.FC<WorkbenchProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [rejectionModal, setRejectionModal] = useState<boolean>(false);
   const [rejectionReason, setRejectionReason] = useState<string>('');
-  const [viewerMode, setViewerMode] = useState<'source' | 'ocr' | 'evidence'>('source');
+  const [streamFilter, setStreamFilter] = useState<'ALL' | 'STREAM_A_ITH_TRAVEL' | 'STREAM_B_AIRLINE_TAX_CREDIT'>('ALL');
+  const [viewerMode, setViewerMode] = useState<'source' | 'ocr' | 'evidence' | 'return_email'>('source');
+  const [emailDispatchedNotice, setEmailDispatchedNotice] = useState<boolean>(false);
 
   const handleDeleteCurrentDoc = () => {
     if (!currentDoc) return;
@@ -362,26 +369,84 @@ export const Workbench: React.FC<WorkbenchProps> = ({
     <div className="space-y-4">
       {/* Top Document Switcher Bar */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 p-3 bg-neutral-950 border border-neutral-800 rounded-lg">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="text-xs text-neutral-400 font-medium">Document:</label>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Stream Filter Pills */}
+          <div className="flex items-center gap-1 p-0.5 bg-neutral-900 border border-neutral-800 rounded text-[11px] font-mono">
+            <button
+              onClick={() => setStreamFilter('ALL')}
+              className={`px-2 py-0.5 rounded transition-colors ${
+                streamFilter === 'ALL' ? 'bg-neutral-800 text-white font-semibold' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              All ({documents.length})
+            </button>
+            <button
+              onClick={() => setStreamFilter('STREAM_A_ITH_TRAVEL')}
+              className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                streamFilter === 'STREAM_A_ITH_TRAVEL' ? 'bg-emerald-950 text-emerald-300 font-semibold border border-emerald-700/50' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3 h-3 text-emerald-400" />
+              Stream A ({documents.filter((d) => (d as any).stream_code !== 'STREAM_B_AIRLINE_TAX_CREDIT').length})
+            </button>
+            <button
+              onClick={() => setStreamFilter('STREAM_B_AIRLINE_TAX_CREDIT')}
+              className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                streamFilter === 'STREAM_B_AIRLINE_TAX_CREDIT' ? 'bg-blue-950 text-blue-300 font-semibold border border-blue-700/50' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Plane className="w-3 h-3 text-blue-400" />
+              Stream B ({documents.filter((d) => (d as any).stream_code === 'STREAM_B_AIRLINE_TAX_CREDIT').length})
+            </button>
+          </div>
+
+          <label className="text-xs text-neutral-400 font-medium hidden sm:inline-block">Doc:</label>
           <select
             value={currentDoc.id}
             onChange={(e) => setSelectedDocId(e.target.value)}
             className="px-2.5 py-1.5 bg-neutral-900 border border-neutral-700 rounded text-xs font-mono text-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-xs truncate"
           >
-            {documents.map((doc) => {
-              const isForeign = doc.currency_code && doc.currency_code !== 'INR';
-              const amtLabel = isForeign
-                ? `${formatOriginalCurrency(doc.total_amount, doc.currency_code)} ≈ ${formatINR(doc.converted_total_inr || convertToINR(doc.total_amount, doc.currency_code, doc.exchange_rate_to_inr))}`
-                : formatINR(doc.total_amount);
+            {documents
+              .filter((doc) => streamFilter === 'ALL' || (doc as any).stream_code === streamFilter || (streamFilter === 'STREAM_A_ITH_TRAVEL' && (doc as any).stream_code !== 'STREAM_B_AIRLINE_TAX_CREDIT'))
+              .map((doc) => {
+                const isForeign = doc.currency_code && doc.currency_code !== 'INR';
+                const amtLabel = isForeign
+                  ? `${formatOriginalCurrency(doc.total_amount, doc.currency_code)} ≈ ${formatINR(doc.converted_total_inr || convertToINR(doc.total_amount, doc.currency_code, doc.exchange_rate_to_inr))}`
+                  : formatINR(doc.total_amount);
 
-              return (
-                <option key={doc.id} value={doc.id}>
-                  {doc.original_filename} ({doc.document_number}) · {amtLabel} · {doc.document_status}
-                </option>
-              );
-            })}
+                return (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.original_filename} ({doc.document_number}) · {amtLabel} · {doc.document_status}
+                  </option>
+                );
+              })}
           </select>
+
+          {/* Active Stream Badge */}
+          {(currentDoc as any).stream_code === 'STREAM_B_AIRLINE_TAX_CREDIT' ? (
+            <span
+              className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center gap-1"
+              title="Stream B: Airline Tax Invoice strictly used for GST/VAT Input Tax Credit recovery"
+            >
+              <Plane className="w-3 h-3 text-blue-400" />
+              <span>Stream B (Airline ITC)</span>
+            </span>
+          ) : (
+            <span
+              className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-1"
+              title="Stream A: Travel Agency / ITH corporate invoice for AP vendor payment posting"
+            >
+              <Building2 className="w-3 h-3 text-emerald-400" />
+              <span>Stream A (Travel / ITH)</span>
+            </span>
+          )}
+
+          {/* Subcategory Badge */}
+          {((currentDoc as any).subcategory || currentDoc.expense_category) && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-neutral-300 uppercase">
+              {(currentDoc as any).subcategory || currentDoc.expense_category}
+            </span>
+          )}
 
           <span
             className={`font-mono text-xs px-2 py-0.5 rounded border ${
@@ -502,6 +567,17 @@ export const Workbench: React.FC<WorkbenchProps> = ({
               >
                 <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                 <span>AI Evidence</span>
+              </button>
+              <button
+                onClick={() => setViewerMode('return_email')}
+                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                  viewerMode === 'return_email'
+                    ? 'bg-neutral-800 text-white font-semibold'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Return-Email Preview</span>
               </button>
             </div>
 
@@ -773,6 +849,138 @@ export const Workbench: React.FC<WorkbenchProps> = ({
                     <div className="text-neutral-400">Confidence: <span className="text-neutral-200">{fld.confidence}%</span> · Extractor: <span className="text-neutral-200">{fld.extractor_name || 'Layer 3 AI'}</span></div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: RETURN-EMAIL NOTIFICATION PREVIEW */}
+          {viewerMode === 'return_email' && (
+            <div className="flex-1 p-4 overflow-auto bg-neutral-950 space-y-4 text-xs">
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-emerald-400" />
+                  <span className="font-semibold text-white">Autonomous Return-Email Notification</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    Email-Out Delivery
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setEmailDispatchedNotice(true);
+                    addLog(
+                      'WORKFLOW',
+                      'EMAIL_RETURN_DISPATCHED',
+                      'SUCCESS',
+                      `Return email dispatched to ${currentDoc.return_email_preview?.recipient_email || 'traveldesk@snpl.com.np'} with SAP batch file and MIS package`,
+                      0,
+                      undefined,
+                      currentDoc.id
+                    );
+                    setTimeout(() => setEmailDispatchedNotice(false), 3000);
+                  }}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                >
+                  <Send className="w-3 h-3" />
+                  <span>{emailDispatchedNotice ? 'Dispatched!' : 'Simulate Send Email'}</span>
+                </button>
+              </div>
+
+              {/* Email Envelope Metadata */}
+              <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-lg space-y-2 font-mono text-[11px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Stream Route:</span>
+                  <span className="text-emerald-400 font-semibold">
+                    {(currentDoc as any).stream_code === 'STREAM_B_AIRLINE_TAX_CREDIT'
+                      ? 'Stream B (Airline GST/VAT Tax Credit Recovery)'
+                      : 'Stream A (Travel-Agency / ITH Vendor Payment)'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Recipient (Submitter):</span>
+                  <span className="text-white">
+                    {currentDoc.return_email_preview?.recipient_email || 'traveldesk@snpl.com.np'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Subject Line:</span>
+                  <span className="text-blue-300 truncate max-w-md">
+                    {currentDoc.return_email_preview?.email_subject ||
+                      `Re: [${(currentDoc as any).stream_code || 'STREAM_A'}] ${currentDoc.document_number} - Processed & SAP ECC Batch Generated`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Outcome Status:</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                      currentDoc.document_status === 'APPROVED'
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                        : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                    }`}
+                  >
+                    {currentDoc.return_email_preview?.outcome_status ||
+                      (currentDoc.document_status === 'APPROVED' ? 'SUCCESS_STP' : 'EXCEPTION_REVIEW')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Attached Artifacts */}
+              <div className="p-3 bg-neutral-900/60 border border-neutral-800 rounded-lg space-y-2 text-xs">
+                <span className="text-neutral-400 font-semibold block text-[11px] uppercase tracking-wider font-mono">
+                  Autonomous Attachments Included in Email
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px]">
+                  <div className="p-2 bg-neutral-950 border border-neutral-800 rounded flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <div className="truncate">
+                      <span className="text-neutral-200 block truncate">
+                        {currentDoc.return_email_preview?.attached_sap_file ||
+                          `SAP_ECC_FB60_${currentDoc.document_number}.txt`}
+                      </span>
+                      <span className="text-[10px] text-neutral-500">SAP ECC Direct Upload Batch</span>
+                    </div>
+                  </div>
+                  <div className="p-2 bg-neutral-950 border border-neutral-800 rounded flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <div className="truncate">
+                      <span className="text-neutral-200 block truncate">
+                        {currentDoc.return_email_preview?.attached_mis_package ||
+                          `MIS_PACKAGE_${currentDoc.document_number}.zip`}
+                      </span>
+                      <span className="text-[10px] text-neutral-500">Zipped Invoices + MIS Sheet</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rendered HTML Email Preview */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider block">
+                  Formatted Email Body (As Rendered by Jinja2 / Graph Engine)
+                </span>
+                <div className="p-4 bg-white text-neutral-900 rounded-lg border border-neutral-700 shadow-xl overflow-x-auto text-xs">
+                  {currentDoc.return_email_preview?.email_body_html ? (
+                    <div
+                      dangerouslySetInnerHTML={{ __html: currentDoc.return_email_preview.email_body_html }}
+                    />
+                  ) : (
+                    <div className="space-y-3 font-sans">
+                      <div className="bg-emerald-800 text-white p-3 rounded font-semibold text-sm">
+                        Invoice Processed Successfully (STP Approved)
+                      </div>
+                      <p>Dear Submitter,</p>
+                      <p>Your travel expenditure document has been validated and matched against SAP ECC master data for vendor payment posting.</p>
+                      <table className="w-full border-collapse border border-neutral-300 text-xs my-2">
+                        <tbody>
+                          <tr className="bg-neutral-100"><td className="border p-2 font-bold">Invoice Number:</td><td className="border p-2">{currentDoc.document_number}</td></tr>
+                          <tr><td className="border p-2 font-bold">Vendor:</td><td className="border p-2">{currentDoc.vendor_name}</td></tr>
+                          <tr className="bg-neutral-100"><td className="border p-2 font-bold">Total Amount:</td><td className="border p-2">{currentDoc.currency_code} {currentDoc.total_amount}</td></tr>
+                          <tr><td className="border p-2 font-bold">Trip ID:</td><td className="border p-2">{currentDoc.trip_id || 'TRIP-2026-9410 (Fallback Match)'}</td></tr>
+                        </tbody>
+                      </table>
+                      <p className="text-[11px] text-neutral-500 mt-2">Attached: SAP ECC Batch Posting File &amp; MIS Tracking Package.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
