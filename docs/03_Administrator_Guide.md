@@ -80,3 +80,46 @@ rsync -avz /var/lib/invoiceflow/artifacts/ /backup_storage/artifacts/
 # Restore PostgreSQL database
 pg_restore -U postgres -h localhost -d invoiceflow -v /backups/invoiceflow_target.dump
 ```
+
+---
+
+## 5. Master Data Updates by Email Procedure (Part D.4)
+
+Finance administrators can update master tables without direct SQL access:
+
+1. **Emailing the File:**
+   - Attach the SAP CSV export of the master (e.g. `VENDORS_EXPORT_20260930.csv`).
+   - Send from an authorized corporate domain (e.g. `@snpl.com.np`, `@enterprise.internal`) to `masters@snpl.com.np`.
+   - Subject line must include the master type keyword (e.g. `[MASTER UPDATE: VENDOR]`).
+2. **Automated Safety & Diff Calculation:**
+   - The engine validates header columns and computes rows added, updated, or deactivated.
+   - **Safety Threshold:** If deactivations exceed 10.0%, the import status is held in `PENDING_APPROVAL`.
+3. **Approving or Rolling Back:**
+   - In the Admin Console under **Master Data Management > Import Batches**, review the diff summary.
+   - Click **Approve & Apply** to commit changes, or **Rollback** to immediately restore the prior snapshot.
+   - Alternatively via CLI:
+     ```bash
+     python -m app.cli master-import --type VENDOR --file /path/to/vendors.csv --apply
+     ```
+
+---
+
+## 6. Accuracy Evaluation Harness Operation (Part G)
+
+To empirically test sample invoice batches against ground truth:
+
+1. **Register an Evaluation Sample Set:**
+   ```bash
+   python -m app.cli eval create-set --name CUSTOMER_SAMPLES_V1 --folder /data/customer_samples/
+   ```
+2. **Ground Truth Entry:**
+   - Access **Evaluation Harness > Ground Truth Editor** in the Admin Console.
+   - Enter verified invoice values once (stored separately from production data; never exported to SAP).
+3. **Execute Benchmark in Sandbox Mode:**
+   ```bash
+   python -m app.cli eval run --set CUSTOMER_SAMPLES_V1 --model-profile gemini-3.1-flash-lite
+   ```
+4. **Inspect Generated Report:**
+   - Automatically outputs detailed Markdown report and Excel workbook.
+   - Evaluates exact-match %, tolerance-match %, straight-through processing (STP) rate, tokens consumed, and effective cost per invoice against the 15 paisa benchmark.
+

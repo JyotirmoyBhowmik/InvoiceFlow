@@ -17,7 +17,7 @@ export const AIConsole: React.FC = () => {
   const { fields, addLog } = useInvoiceFlowStore();
 
   const [activeProvider, setActiveProvider] = useState<'GEMINI' | 'AZURE_DI' | 'OPENAI' | 'ANTHROPIC'>('GEMINI');
-  const [modelName, setModelName] = useState('gemini-2.5-flash');
+  const [modelName, setModelName] = useState('gemini-3.1-flash-lite');
   const [monthlyBudgetInr, setMonthlyBudgetInr] = useState(8500.0);
   const [currentSpendInr, setCurrentSpendInr] = useState(1285.50);
 

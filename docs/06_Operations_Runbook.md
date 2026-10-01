@@ -65,3 +65,17 @@ To archive logs older than 180 days:
 pg_dump -U postgres -d invoiceflow -t "invoiceflow.process_log_2026_01" | gzip > /archives/process_log_2026_01.sql.gz
 psql -U postgres -d invoiceflow -c "DROP TABLE invoiceflow.process_log_2026_01;"
 ```
+
+---
+
+## 4. Prompt 03 Error Codes & Resolution Playbooks
+
+| Error Code | Severity | Description | Automated System Action | Operator Remediation Playbook |
+|---|---|---|---|---|
+| `VAL_STREAM_DOUBLE_CLAIM` | `WARN` | Potential duplicate tax credit claim detected across streams (same PNR/Ticket previously posted in Stream A). | Flagged on document; cross-stream link record created in `stream_cross_link`. | Inspect linked document in Workbench. Confirm that expense is not double-booked while releasing tax asset. |
+| `TAX_VAT13_RECON_MISMATCH` | `BLOCK` | Nepal VAT 13% calculation mismatch exceeds arithmetic tolerance (0.05 NPR). | Routed to Exception Queue; blocks straight-through export. | Verify printed bill. Check whether bill includes exempt items or service charge prior to VAT. |
+| `MSTR_SAFETY_THRESHOLD_BREACHED`| `BLOCK` | Master import file would deactivate > 10% of existing master records. | Master batch status set to `PENDING_APPROVAL`; import paused. | Review diff in Admin Console. Confirm legitimate mass deactivation before clicking Approve, or reject file. |
+| `VAL_TRIP_ID_UNVERIFIED` | `WARN` | Trip ID extracted from invoice is missing from `trip_reference` table. | Fallback employee + date keys evaluated. | Verified via employee travel authorization; document released with warning. |
+| `MSTR_VENDOR_RESOLVED_BY_PAN` | `INFO` | Vendor code mapped primarily through 9-digit Nepal PAN or 15-char GSTIN. | Stamped with `EXTRACTED` tax ID provenance. | Informational; straight-through processing proceeds. |
+| `VAL_BS_CALENDAR_UNMAPPED` | `WARN` | Bikram Sambat date falls outside active database calendar table. | Mathematical fallback calculation applied; warning logged. | Add upcoming calendar year to `bikram_sambat_calendar` via master import. |
+

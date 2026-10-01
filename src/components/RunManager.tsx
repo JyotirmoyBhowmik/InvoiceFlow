@@ -217,6 +217,61 @@ export const RunManager: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadMisPackage = (run: ExportRunRecord) => {
+    // Generate Tab-Separated Excel-ready tracking report matching meeting notes
+    const headers = [
+      'RUN_NUMBER',
+      'INVOICE_NUMBER',
+      'INVOICE_DATE',
+      'VENDOR_CODE',
+      'VENDOR_NAME',
+      'TAX_ID_GSTIN',
+      'TRIP_ID',
+      'PNR_TICKET',
+      'EXPENSE_CATEGORY',
+      'CURRENCY',
+      'TAXABLE_BASE',
+      'TAX_AMOUNT',
+      'TOTAL_GROSS',
+      'CONVERTED_INR',
+      'GST_ITC_STATUS',
+      'STP_SCORE',
+      'STATUS',
+      'ARTIFACT_FILENAME',
+    ];
+
+    const rows = documents.map((doc) => [
+      run.run_number,
+      doc.document_number,
+      doc.document_date,
+      doc.vendor_code || '100088',
+      doc.vendor_name || 'Vendor',
+      doc.fields['vendor_tax_id']?.normalized_value || '',
+      doc.trip_id || doc.fields['trip_id']?.normalized_value || 'N/A',
+      doc.pnr_number || doc.fields['pnr_ticket']?.normalized_value || 'N/A',
+      doc.expense_category || 'TRAVEL',
+      doc.currency_code || 'INR',
+      (doc.total_amount - doc.tax_amount).toFixed(2),
+      doc.tax_amount.toFixed(2),
+      doc.total_amount.toFixed(2),
+      (doc.converted_total_inr || doc.total_amount).toFixed(2),
+      doc.gst_claim_status || 'NOT_APPLICABLE',
+      `${doc.stp_score}%`,
+      doc.document_status,
+      doc.original_filename,
+    ]);
+
+    const tsvContent = [headers.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n');
+    handleDownloadFile(tsvContent, `ITD_MIS_TRACKING_${run.run_number}.tsv`, 'text/tab-separated-values');
+
+    addLog(
+      'EXPORT_ENGINE',
+      'MIS_PACKAGE_DOWNLOADED',
+      'SUCCESS',
+      `ITD MIS Tracking Package generated and downloaded for ${run.run_number} (${rows.length} invoices)`
+    );
+  };
+
   const handleReverseRun = (run: ExportRunRecord) => {
     const updated = exportRuns.map((r) => (r.id === run.id ? { ...r, status: 'REVERSED' as const } : r));
     setExportRuns(updated);

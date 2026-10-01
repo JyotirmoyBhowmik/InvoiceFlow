@@ -124,6 +124,15 @@ export interface DocumentRecord {
   gl_account_code?: string;
   expense_category?: string;
   tax_code?: string;
+  trip_id?: string;
+  booking_type?: 'AIRLINE' | 'HOTEL' | 'CAB' | 'TRAIN' | 'ITH_CONSOLIDATED' | 'GENERAL';
+  pnr_number?: string;
+  ticket_number?: string;
+  passenger_name?: string;
+  flight_sector?: string;
+  gst_claim_status?: 'ELIGIBLE_ITC' | 'INELIGIBLE' | 'NEPAL_VAT_CLAIM' | 'NOT_APPLICABLE';
+  business_place?: string;
+  section_code?: string;
   review_reason?: string;
   fields: Record<string, ExtractedField>;
   line_items: InvoiceLineItem[];
@@ -376,3 +385,165 @@ export interface UserSession {
   auth_provider: 'LOCAL' | 'ENTRA_ID_SSO' | 'BREAK_GLASS';
   session_expires_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Prompt 03: Reference Solution Alignment Entities
+// ---------------------------------------------------------------------------
+
+export interface ProcessingStreamEntity {
+  id: string;
+  stream_code: 'STREAM_A_ITH_TRAVEL' | 'STREAM_B_AIRLINE_TAX_CREDIT' | string;
+  stream_name: string;
+  description: string;
+  purpose: 'VENDOR_PAYMENT' | 'TAX_CREDIT_CLAIM' | 'GENERAL';
+  export_profile_key: string;
+  scheduler_cron: string;
+  auto_approve_threshold: number;
+  notification_template_key: string;
+  reply_to_mode: 'ORIGINAL_SENDER' | 'FINANCE_MAILBOX' | 'BOTH' | 'DISTRIBUTION_LIST' | 'REPLY_ALL';
+  finance_notification_email?: string;
+  detection_priority: number;
+  detection_rules: {
+    mailbox_patterns?: string[];
+    subject_keywords?: string[];
+    vendor_tax_ids?: string[];
+    pnr_required?: boolean;
+  };
+  is_active: boolean;
+}
+
+export interface ProcessingStreamSubcategory {
+  id: string;
+  stream_code: string;
+  subcategory_code: 'HOTEL' | 'AIRLINE' | 'TRAIN' | 'CAB' | 'GENERAL' | string;
+  subcategory_name: string;
+  mandatory_field_keys: string[];
+  default_expense_gl?: string;
+  default_cost_center?: string;
+  default_booking_type?: string;
+  is_active: boolean;
+}
+
+export interface TaxRegimeEntity {
+  id: string;
+  regime_code: 'NEPAL_VAT' | 'INDIA_GST' | string;
+  regime_name: string;
+  country_code: string;
+  tax_type: 'VAT' | 'GST';
+  identifier_name: 'PAN' | 'GSTIN' | string;
+  identifier_regex: string;
+  checksum_validator: string;
+  standard_tax_rate: number;
+  input_tax_claimable: boolean;
+  is_active: boolean;
+}
+
+export interface BikramSambatCalendarRecord {
+  id: string;
+  ad_date: string; // YYYY-MM-DD
+  bs_year: number;
+  bs_month: number;
+  bs_day: number;
+  bs_date_str: string; // e.g. 2083-06-08
+  bs_month_name_nepali: string;
+  bs_month_name_roman: string;
+  nepal_fiscal_year: string;
+  nepal_fiscal_period: number;
+  is_working_day: boolean;
+}
+
+export interface ProfitCenterEntity {
+  id: string;
+  profit_center_code: string;
+  profit_center_name: string;
+  company_code: string;
+  segment_code?: string;
+  is_active: boolean;
+}
+
+export interface MasterImportProfileEntity {
+  id: string;
+  profile_key: string;
+  master_type: 'VENDOR' | 'GL_ACCOUNT' | 'COST_CENTER' | 'PROFIT_CENTER' | 'TAX_CODE' | 'EMPLOYEE' | 'TRIP_REFERENCE';
+  description: string;
+  receiving_mailbox: string;
+  allowed_sender_domains: string[];
+  subject_pattern: string;
+  file_name_pattern: string;
+  import_mode: 'UPSERT' | 'FULL_REPLACE' | 'DELTA';
+  require_admin_approval: boolean;
+  max_deactivation_pct: number;
+  is_active: boolean;
+}
+
+export interface MasterImportBatchRecord {
+  id: string;
+  batch_number: string;
+  profile_key: string;
+  source_channel: 'EMAIL' | 'MANUAL_UPLOAD' | 'CLI' | 'API';
+  sender_email?: string;
+  original_filename: string;
+  total_rows: number;
+  rows_added: number;
+  rows_updated: number;
+  rows_deactivated: number;
+  status: 'RECEIVED' | 'VALIDATING' | 'DIFF_CALCULATED' | 'PENDING_APPROVAL' | 'APPLIED' | 'REJECTED' | 'ROLLED_BACK';
+  safety_threshold_breached: boolean;
+  rejection_reason?: string;
+  created_at: string;
+  applied_at?: string;
+}
+
+export interface EvaluationSetRecord {
+  id: string;
+  set_name: string;
+  description: string;
+  folder_path?: string;
+  total_samples: number;
+  sample_categories: string[];
+  is_locked: boolean;
+  created_at: string;
+}
+
+export interface GroundTruthRecordEntity {
+  id: string;
+  evaluation_set_id: string;
+  sample_filename: string;
+  stream_code: string;
+  subcategory?: string;
+  is_nepali_language: boolean;
+  is_handwritten: boolean;
+  ground_truth_fields: Record<string, any>;
+  verified_by: string;
+  verified_at: string;
+}
+
+export interface EvaluationRunRecord {
+  id: string;
+  run_code: string;
+  evaluation_set_id: string;
+  model_profile: string;
+  total_evaluated: number;
+  overall_exact_match_pct: number;
+  overall_tolerance_match_pct: number;
+  stp_rate_pct: number;
+  nepali_language_accuracy_pct: number;
+  avg_latency_ms: number;
+  avg_cost_inr: number;
+  avg_cost_npr: number;
+  status: string;
+  created_at: string;
+}
+
+export interface AiModelPricingEntity {
+  id: string;
+  model_key: string;
+  provider_name: string;
+  price_per_1m_input_usd: number;
+  price_per_1m_output_usd: number;
+  benchmark_inr_target: number;
+  usd_to_inr_rate: number;
+  inr_to_npr_rate: number;
+  is_active: boolean;
+}
+

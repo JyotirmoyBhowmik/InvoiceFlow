@@ -69,7 +69,7 @@ export const OcrPipelineDesigner: React.FC = () => {
       name: 'Layer 3: Advanced AI Structured Extraction',
       key: 'AI_EXTRACTION',
       enabled: true,
-      params: { provider: 'GEMINI', model: 'gemini-2.5-flash', enforce_json_schema: true },
+      params: { provider: 'GEMINI', model: 'gemini-3.1-flash-lite', enforce_json_schema: true },
     },
   ]);
 

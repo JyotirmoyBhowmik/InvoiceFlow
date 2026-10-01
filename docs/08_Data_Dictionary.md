@@ -67,3 +67,85 @@ Stores individual field extractions with spatial coordinates and provenance trac
 | `value_source` | `VARCHAR(30)` | No | `EXTRACTED`, `USER_CORRECTED`, `DERIVED`, `MASTER_DEFAULT`, `NOT_FOUND` |
 | `source_bounding_box` | `JSONB` | Yes | Spatial coordinates `{x, y, w, h}` on document |
 | `is_edited` | `BOOLEAN` | No | Indicates manual human correction in workbench |
+
+---
+
+## 3. Prompt 03 Reference Solution Tables
+
+### Table: `invoiceflow.processing_stream`
+Defines configurable business processing streams (Stream A: Travel Payment vs Stream B: Tax Credit).
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| `id` | `UUID` | No | Primary Key |
+| `stream_code` | `VARCHAR(50)` | No | Unique identifier (`STREAM_A_ITH_TRAVEL`, `STREAM_B_AIRLINE_TAX_CREDIT`) |
+| `stream_name` | `VARCHAR(150)` | No | Descriptive title |
+| `purpose` | `VARCHAR(50)` | No | `VENDOR_PAYMENT`, `TAX_CREDIT_CLAIM`, `GENERAL` |
+| `export_profile_key` | `VARCHAR(100)` | No | Linked SAP ECC export profile |
+| `scheduler_cron` | `VARCHAR(50)` | No | Cron schedule (e.g. `0 * * * *` for hourly :00 execution) |
+| `auto_approve_threshold`| `NUMERIC(5,2)` | No | Minimum confidence cutoff for straight-through approval (default 95.00) |
+| `detection_rules` | `JSONB` | No | Mailbox, sender, subject, and AI keyword detection criteria |
+
+### Table: `invoiceflow.processing_stream_subcategory`
+Defines sub-categories (Hotel, Air, Train, Cab) with specialized mandatory field matrices.
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| `id` | `UUID` | No | Primary Key |
+| `stream_code` | `VARCHAR(50)` | No | Foreign Key to `processing_stream(stream_code)` |
+| `subcategory_code`| `VARCHAR(50)` | No | `HOTEL`, `AIRLINE`, `TRAIN`, `CAB`, `GENERAL` |
+| `mandatory_field_keys`| `JSONB` | No | Array of mandatory field keys required before auto-approval |
+| `default_expense_gl` | `VARCHAR(50)` | Yes | Default SAP GL account for category |
+
+### Table: `invoiceflow.tax_regime`
+Regime-driven tax master supporting Nepal VAT, Indian GST, and global VAT.
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| `regime_code` | `VARCHAR(50)` | No | Unique key (`NEPAL_VAT`, `INDIA_GST`) |
+| `tax_type` | `VARCHAR(30)` | No | `VAT`, `GST` |
+| `identifier_name`| `VARCHAR(50)` | No | `PAN` (Nepal 9-digit), `GSTIN` (India 15-char) |
+| `identifier_regex`| `VARCHAR(255)` | No | Verification regular expression |
+| `standard_tax_rate`| `NUMERIC(5,2)`| No | Default tax percentage (13.00 for Nepal VAT) |
+| `input_tax_claimable`| `BOOLEAN` | No | Flags if input-tax credit is legally claimable |
+
+### Table: `invoiceflow.bikram_sambat_calendar`
+Maintainable database conversion table for Bikram Sambat (B.S.) to Gregorian (A.D.) dates.
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| `ad_date` | `DATE` | No | Gregorian date (Unique Key) |
+| `bs_year` | `INT` | No | Bikram Sambat year (e.g. 2083) |
+| `bs_month` | `INT` | No | Month (1 = Baisakh, 6 = Ashwin, etc.) |
+| `bs_day` | `INT` | No | Day of month |
+| `bs_date_str` | `VARCHAR(20)` | No | Formatted B.S. date (e.g. `2083-06-08`) |
+| `nepal_fiscal_year`| `VARCHAR(20)` | No | Nepal Fiscal Year (e.g. `2083/84`) |
+| `nepal_fiscal_period`| `INT` | No | Accounting period 1 (Shrawan) to 12 (Ashadh) |
+
+### Table: `invoiceflow.master_import_batch`
+Tracks automated master data view file updates by email or upload.
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| `batch_number` | `VARCHAR(60)` | No | Unique batch reference |
+| `profile_key` | `VARCHAR(60)` | No | Reference to `master_import_profile` |
+| `total_rows` | `INT` | No | Total rows ingested |
+| `rows_added` | `INT` | No | Added records |
+| `rows_updated` | `INT` | No | Updated records |
+| `rows_deactivated`| `INT` | No | Deactivated records |
+| `safety_threshold_breached`| `BOOLEAN`| No | True if deactivation exceeds threshold (10.0%) |
+| `status` | `VARCHAR(30)` | No | `RECEIVED`, `DIFF_CALCULATED`, `PENDING_APPROVAL`, `APPLIED`, `ROLLED_BACK` |
+
+### Table: `invoiceflow.evaluation_run`
+Logs sandbox evaluation harness accuracy results against ground truth.
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| `run_code` | `VARCHAR(60)` | No | Unique evaluation run code |
+| `model_profile` | `VARCHAR(100)` | No | AI model tested (`gemini-3.1-flash-lite`, etc.) |
+| `overall_exact_match_pct`| `NUMERIC(5,2)`| No | Exact character match percentage |
+| `overall_tolerance_match_pct`| `NUMERIC(5,2)`| No | Tolerance match (delta <= 0.05) percentage |
+| `stp_rate_pct` | `NUMERIC(5,2)`| No | Straight-through processing rate |
+| `nepali_language_accuracy_pct`| `NUMERIC(5,2)`| No | Devanagari & Nepali accuracy percentage |
+| `avg_cost_inr` | `NUMERIC(10,4)`| No | Average AI cost per invoice in INR |
+

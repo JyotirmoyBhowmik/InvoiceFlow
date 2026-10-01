@@ -2,22 +2,90 @@
 
 ---
 
-## 1. System Requirements & Hardware Sizing
+## 1. System Requirements & Deployment Profiles
 
-| Workload Tier | Daily Invoice Volume | CPU Cores | RAM | Storage (NVMe/SSD) | Network IOPS |
-|---|---|---|---|---|---|
-| **Development / POC** | < 250 docs/day | 4 cores | 8 GB | 50 GB | Standard |
-| **Standard Production** | 2,500 – 5,000 docs/day | 8 cores | 16 GB | 250 GB | 1,500 IOPS |
-| **Enterprise High-Volume** | > 10,000 docs/day | 16 cores | 32 GB | 1 TB (RAID 10) | 5,000 IOPS |
+InvoiceFlow supports two deployment profiles to accommodate varying operational scales:
 
-- **Operating System**: Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Red Hat Enterprise Linux 9, or Debian 12.
-- **Runtimes**: Python 3.14, Node.js 20 LTS.
-- **Data Stores**: PostgreSQL 16+ (with `pgcrypto`, `pg_trgm`, `uuid-ossp`, `btree_gin`), Redis 7+.
-- **OCR Libraries**: Tesseract 5.3+ (`tesseract-ocr`, `libtesseract-dev`, `ffmpeg`, `libsm6`, `libxext6`).
+### 1.1 Full Enterprise Profile (High-Volume Multi-Tenant)
+- **Components:** Headless Worker + Web Admin Panel + PostgreSQL 16 + Redis 7 + Celery Workers + Flower.
+- **Sizing:** 8–16 CPU cores, 16–32 GB RAM, SSD/NVMe storage.
+- **Applicability:** Multi-company implementations with concurrent human review teams (> 2,500 invoices/day).
+
+### 1.2 Lite Profile (Minimum Headless Deployment — Recommended for Customer)
+- **Components:** Headless Worker + Relational Database + Object Storage (Local/Azure Blob).
+- **Zero Redis Dependency:** Uses lightweight internal `APScheduler` instead of Celery/Redis.
+- **Zero UI Dependency:** The processing engine runs fully as a console background service (`python -m app.cli serve-worker`).
+- **Sizing:** 2–4 CPU cores, 4–8 GB RAM. Operates comfortably on a standard Azure B2s VM or Azure Container App.
+- **Applicability:** Unattended email-in / email-out travel & airline processing (1,000–3,000 invoices/month).
 
 ---
 
-## 2. Network Ports & Firewall Rules
+## 2. Database Portability & Dialect Switch
+
+InvoiceFlow uses pure application-layer business logic through SQLAlchemy 2.0. Database triggers and stored procedures containing business logic are strictly eliminated, enabling seamless portability across database engines:
+
+### 2.1 Target Dialect Configuration (`DATABASE_URL`)
+- **PostgreSQL 16+ (Default):**
+  ```env
+  DATABASE_URL=postgresql+asyncpg://app_user:StrongPassword@localhost:5432/invoiceflow
+  ```
+- **Microsoft Azure SQL / SQL Server 2022:**
+  ```env
+  DATABASE_URL=mssql+aioodbc://app_user:StrongPassword@customer-sql.database.windows.net:1433/invoiceflow?driver=ODBC+Driver+18+for+SQL+Server
+  ```
+- **MySQL 8.0+ / Azure Database for MySQL:**
+  ```env
+  DATABASE_URL=mysql+aiomysql://app_user:StrongPassword@localhost:3306/invoiceflow
+  ```
+
+*Note on Fuzzy Matching:* On PostgreSQL, `pg_trgm` GIN indexes are used when available; on SQL Server and MySQL, InvoiceFlow automatically activates the built-in, portable Python Levenshtein/Jaro-Winkler application-layer matching engine with identical scoring results.
+
+---
+
+## 3. Azure Deployment Architecture (Customer Dedicated Tenant)
+
+Deploying within Customer's Azure tenant ensures complete data sovereignty and direct ExpressRoute integration with SAP ECC:
+
+```bash
+# 1. Create dedicated Resource Group
+az group create --name rg-customer-invoiceflow --location southeastasia
+
+# 2. Provision Azure Database for PostgreSQL Flexible Server
+az postgres flexible-server create \
+  --resource-group rg-customer-invoiceflow \
+  --name ps-customer-invoiceflow \
+  --location southeastasia \
+  --admin-user invoiceflow_admin \
+  --admin-password 'ComplexPassword123!' \
+  --sku-name Standard_B2s \
+  --tier Burstable \
+  --storage-size 64
+
+# 3. Provision Azure Blob Storage Container with Private Endpoint
+az storage account create \
+  --resource-group rg-customer-invoiceflow \
+  --name stcustomerinvoiceflow \
+  --location southeastasia \
+  --sku Standard_LRS
+
+# 4. Deploy InvoiceFlow Headless Worker Container App
+az containerapp create \
+  --name app-invoiceflow-worker \
+  --resource-group rg-customer-invoiceflow \
+  --environment env-customer-apps \
+  --image customeracr.azurecr.io/invoiceflow-worker:latest \
+  --target-port 8000 \
+  --ingress internal \
+  --env-vars \
+    DATABASE_URL="secretref:db-conn" \
+    STORAGE_TYPE="AZURE_BLOB" \
+    AZURE_STORAGE_ACCOUNT="stcustomerinvoiceflow" \
+    AI_PROVIDER_DEFAULT="AZURE_OPENAI"
+```
+
+---
+
+## 4. Network Ports & Firewall Rules
 
 | Port | Protocol | Source | Destination | Purpose | Access Scope |
 |---|---|---|---|---|---|

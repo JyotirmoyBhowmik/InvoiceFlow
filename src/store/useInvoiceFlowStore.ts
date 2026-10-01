@@ -19,7 +19,155 @@ import {
   ApprovalMatrixEntity,
   ThemeConfig,
   SystemSettingsConfig,
+  ProcessingStreamEntity,
+  ProcessingStreamSubcategory,
+  TaxRegimeEntity,
+  BikramSambatCalendarRecord,
+  ProfitCenterEntity,
+  MasterImportProfileEntity,
+  MasterImportBatchRecord,
+  EvaluationSetRecord,
+  EvaluationRunRecord,
+  AiModelPricingEntity,
 } from '../types';
+
+export const SEED_STREAMS: ProcessingStreamEntity[] = [
+  {
+    id: 'stream_a_ith',
+    stream_code: 'STREAM_A_ITH_TRAVEL',
+    stream_name: 'Travel-Agency / ITH Corporate Travel Invoices',
+    description: 'Hotel, air, train, and cab invoices billed through ITH / Travel Desk used for vendor payment posting.',
+    purpose: 'VENDOR_PAYMENT',
+    export_profile_key: 'EXP_SAP_ECC_ITH_VENDOR',
+    scheduler_cron: '0 * * * *',
+    auto_approve_threshold: 95.0,
+    notification_template_key: 'STREAM_PROCESSED_SUMMARY',
+    reply_to_mode: 'REPLY_ALL',
+    finance_notification_email: 'travel.ap@snpl.com.np',
+    detection_priority: 10,
+    detection_rules: {
+      mailbox_patterns: ['travel.invoices@snpl.com.np', 'travel@enterprise.internal'],
+      subject_keywords: ['travel', 'ith', 'duty slip', 'hotel booking', 'itinerary'],
+      vendor_tax_ids: ['07AAACI1920H1ZP'],
+    },
+    is_active: true,
+  },
+  {
+    id: 'stream_b_airline',
+    stream_code: 'STREAM_B_AIRLINE_TAX_CREDIT',
+    stream_name: 'Airline Tax Invoices (GST/VAT Tax Credit Claims)',
+    description: 'Airline-issued tax invoices used strictly to support input-tax credit recovery in SAP.',
+    purpose: 'TAX_CREDIT_CLAIM',
+    export_profile_key: 'EXP_SAP_ECC_AIRLINE_ITC',
+    scheduler_cron: '0 * * * *',
+    auto_approve_threshold: 95.0,
+    notification_template_key: 'STREAM_PROCESSED_SUMMARY',
+    reply_to_mode: 'REPLY_ALL',
+    finance_notification_email: 'airline.tax@snpl.com.np',
+    detection_priority: 20,
+    detection_rules: {
+      mailbox_patterns: ['airline.gst@snpl.com.np', 'airtax@enterprise.internal'],
+      subject_keywords: ['tax invoice', 'passenger ticket', 'gst credit', 'pnr'],
+      pnr_required: true,
+    },
+    is_active: true,
+  },
+];
+
+export const SEED_SUBCATEGORIES: ProcessingStreamSubcategory[] = [
+  {
+    id: 'sub_hotel',
+    stream_code: 'STREAM_A_ITH_TRAVEL',
+    subcategory_code: 'HOTEL',
+    subcategory_name: 'Hotel Accommodations & Hospitality',
+    mandatory_field_keys: ['vendor_name', 'invoice_number', 'invoice_date', 'total_cost', 'tax_amount', 'taxable_value'],
+    default_expense_gl: '600400',
+    default_cost_center: 'CC100',
+    default_booking_type: 'HOTEL',
+    is_active: true,
+  },
+  {
+    id: 'sub_air',
+    stream_code: 'STREAM_A_ITH_TRAVEL',
+    subcategory_code: 'AIRLINE',
+    subcategory_name: 'Commercial Airline Flights',
+    mandatory_field_keys: ['vendor_name', 'invoice_number', 'invoice_date', 'total_cost', 'tax_amount', 'pnr_ticket'],
+    default_expense_gl: '600300',
+    default_cost_center: 'CC100',
+    default_booking_type: 'AIRLINE',
+    is_active: true,
+  },
+  {
+    id: 'sub_train',
+    stream_code: 'STREAM_A_ITH_TRAVEL',
+    subcategory_code: 'TRAIN',
+    subcategory_name: 'Rail & Train Passenger Transport',
+    mandatory_field_keys: ['vendor_name', 'invoice_number', 'invoice_date', 'total_cost', 'tax_amount'],
+    default_expense_gl: '600500',
+    default_cost_center: 'CC100',
+    default_booking_type: 'TRAIN',
+    is_active: true,
+  },
+  {
+    id: 'sub_cab',
+    stream_code: 'STREAM_A_ITH_TRAVEL',
+    subcategory_code: 'CAB',
+    subcategory_name: 'Local Cab & Fleet Duty Slips',
+    mandatory_field_keys: ['vendor_name', 'invoice_number', 'invoice_date', 'total_cost', 'tax_amount'],
+    default_expense_gl: '600600',
+    default_cost_center: 'CC100',
+    default_booking_type: 'CAB',
+    is_active: true,
+  },
+];
+
+export const SEED_TAX_REGIMES: TaxRegimeEntity[] = [
+  {
+    id: 'reg_np_vat',
+    regime_code: 'NEPAL_VAT',
+    regime_name: 'Nepal Value Added Tax (VAT Act 2052)',
+    country_code: 'NP',
+    tax_type: 'VAT',
+    identifier_name: 'PAN',
+    identifier_regex: '^\\d{9}$',
+    checksum_validator: 'IRD_MOD11',
+    standard_tax_rate: 13.0,
+    input_tax_claimable: true,
+    is_active: true,
+  },
+  {
+    id: 'reg_in_gst',
+    regime_code: 'INDIA_GST',
+    regime_name: 'India Goods and Services Tax (GST)',
+    country_code: 'IN',
+    tax_type: 'GST',
+    identifier_name: 'GSTIN',
+    identifier_regex: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
+    checksum_validator: 'GSTIN_MOD36',
+    standard_tax_rate: 18.0,
+    input_tax_claimable: false,
+    is_active: true,
+  },
+];
+
+export const SEED_PROFIT_CENTERS: ProfitCenterEntity[] = [
+  { id: 'pc_corp', profit_center_code: 'PC100', profit_center_name: 'Corporate HQ & General Administration', company_code: '1000', is_active: true },
+  { id: 'pc_snpl', profit_center_code: 'PC200', profit_center_name: 'Surya Nepal Operations & Travel', company_code: '2000', is_active: true },
+  { id: 'pc_itd', profit_center_code: 'PC300', profit_center_name: 'Information Technology Division (ITD)', company_code: '1000', is_active: true },
+];
+
+export const SEED_BS_CALENDAR: BikramSambatCalendarRecord[] = [
+  { id: 'bs_1', ad_date: '2026-09-24', bs_year: 2083, bs_month: 6, bs_day: 8, bs_date_str: '2083-06-08', bs_month_name_nepali: 'आश्विन', bs_month_name_roman: 'Ashwin', nepal_fiscal_year: '2083/84', nepal_fiscal_period: 3, is_working_day: true },
+  { id: 'bs_2', ad_date: '2026-09-25', bs_year: 2083, bs_month: 6, bs_day: 9, bs_date_str: '2083-06-09', bs_month_name_nepali: 'आश्विन', bs_month_name_roman: 'Ashwin', nepal_fiscal_year: '2083/84', nepal_fiscal_period: 3, is_working_day: true },
+  { id: 'bs_3', ad_date: '2026-09-26', bs_year: 2083, bs_month: 6, bs_day: 10, bs_date_str: '2083-06-10', bs_month_name_nepali: 'आश्विन', bs_month_name_roman: 'Ashwin', nepal_fiscal_year: '2083/84', nepal_fiscal_period: 3, is_working_day: false },
+  { id: 'bs_4', ad_date: '2026-09-30', bs_year: 2083, bs_month: 6, bs_day: 14, bs_date_str: '2083-06-14', bs_month_name_nepali: 'आश्विन', bs_month_name_roman: 'Ashwin', nepal_fiscal_year: '2083/84', nepal_fiscal_period: 3, is_working_day: true },
+];
+
+export const SEED_AI_MODEL_PRICING: AiModelPricingEntity[] = [
+  { id: 'pr_lite', model_key: 'gemini-3.1-flash-lite', provider_name: 'GOOGLE', price_per_1m_input_usd: 0.075, price_per_1m_output_usd: 0.30, benchmark_inr_target: 0.15, usd_to_inr_rate: 83.50, inr_to_npr_rate: 1.60, is_active: true },
+  { id: 'pr_flash', model_key: 'gemini-2.5-flash', provider_name: 'GOOGLE', price_per_1m_input_usd: 0.15, price_per_1m_output_usd: 0.60, benchmark_inr_target: 0.15, usd_to_inr_rate: 83.50, inr_to_npr_rate: 1.60, is_active: true },
+  { id: 'pr_azure', model_key: 'azure-openai-gpt4o-mini', provider_name: 'AZURE_OPENAI', price_per_1m_input_usd: 0.15, price_per_1m_output_usd: 0.60, benchmark_inr_target: 0.20, usd_to_inr_rate: 83.50, inr_to_npr_rate: 1.60, is_active: true },
+];
 
 const INITIAL_FIELD_DEFINITIONS: FieldDefinition[] = [
   {
@@ -247,7 +395,189 @@ const INITIAL_FIELD_DEFINITIONS: FieldDefinition[] = [
     ai_hint_text: 'Line item description or payment reference',
     export_column_name: 'SGTXT',
     export_order: 15,
+  },
+  {
+    id: 'f17',
+    field_key: 'trip_id',
+    display_label: 'Trip ID / Booking Ref',
+    data_type: 'STRING',
+    field_group: 'TRAVEL_ATTRS',
+    is_mandatory: false,
+    ui_order: 170,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'Corporate Travel Request / ITH Trip Ref (e.g. TRIP-2026-9410)',
+    export_column_name: 'ZUONR',
+    export_order: 16,
+  },
+  {
+    id: 'f18',
+    field_key: 'pnr_ticket',
+    display_label: 'Airline PNR / Ticket No',
+    data_type: 'STRING',
+    field_group: 'TRAVEL_ATTRS',
+    is_mandatory: false,
+    ui_order: 180,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'Airline PNR (e.g. 6E-W8Q29) or E-Ticket Number',
+    export_column_name: 'PNRNO',
+    export_order: 17,
+  },
+  {
+    id: 'f19',
+    field_key: 'gst_claim_status',
+    display_label: 'GST Credit Claim Status',
+    data_type: 'SELECT',
+    field_group: 'FINANCIALS',
+    is_mandatory: false,
+    ui_order: 190,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'ITC Input Tax Credit Claim Eligibility (ELIGIBLE_ITC, NEPAL_VAT_CLAIM, NOT_APPLICABLE)',
+    options: ['ELIGIBLE_ITC', 'INELIGIBLE', 'NEPAL_VAT_CLAIM', 'NOT_APPLICABLE'],
+    export_column_name: 'ITCCLM',
+    export_order: 18,
+  },
+  {
+    id: 'f20',
+    field_key: 'business_place',
+    display_label: 'Business Place',
+    data_type: 'STRING',
+    field_group: 'ORGANIZATION',
+    is_mandatory: false,
+    ui_order: 200,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'SAP Business Place / State (e.g. 1001 WB, 1007 DL, 2001 NP)',
+    export_column_name: 'BUPLA',
+    export_order: 19,
+  },
+  {
+    id: 'f21',
+    field_key: 'section_code',
+    display_label: 'Section Code (TDS)',
+    data_type: 'STRING',
+    field_group: 'ORGANIZATION',
+    is_mandatory: false,
+    ui_order: 210,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'Withholding tax section (e.g. 194C Contractor/Travel, 194J Professional)',
+    export_column_name: 'SECCO',
+    export_order: 20,
+  },
+  {
+    id: 'f22',
+    field_key: 'document_type',
+    display_label: 'Document Type (SAP)',
+    data_type: 'STRING',
+    field_group: 'HEADER_CORE',
+    is_mandatory: true,
+    ui_order: 220,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'SAP Document Type (KR for Vendor Invoice, KG for Credit Memo)',
+    export_column_name: 'BLART',
+    export_order: 21,
+  },
+  {
+    id: 'f23',
+    field_key: 'payment_terms',
+    display_label: 'Payment Terms',
+    data_type: 'STRING',
+    field_group: 'VENDOR_INFO',
+    is_mandatory: false,
+    ui_order: 230,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'Terms of payment key (e.g. NT30 Net 30, NT00 Immediate)',
+    export_column_name: 'ZTERM',
+    export_order: 22,
+  },
+  {
+    id: 'f24',
+    field_key: 'business_area',
+    display_label: 'Business Area',
+    data_type: 'STRING',
+    field_group: 'ORGANIZATION',
+    is_mandatory: false,
+    ui_order: 240,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'SAP Business Area segment code (e.g. 1000 Corp, 2000 Regional)',
+    export_column_name: 'GSBER',
+    export_order: 23,
+  },
+  {
+    id: 'f25',
+    field_key: 'profit_center',
+    display_label: 'Profit Centre [Call Center]',
+    data_type: 'ENTITY_REF',
+    field_group: 'ORGANIZATION',
+    is_mandatory: false,
+    ui_order: 250,
+    visible_flag: true,
+    editable_flag: true,
+    ai_hint_text: 'SAP Profit Center (CO-PCA) [Resolves meeting notes call center ambiguity]',
+    export_column_name: 'PRCTR',
+    export_order: 24,
   }
+];
+
+export const SEED_VENDORS: VendorEntity[] = [
+  {
+    id: 'v_ith',
+    vendor_code: '100088',
+    vendor_name: 'International Travel House Ltd.',
+    tax_identifier: '07AAACI1920H1ZP',
+    country_code: 'IND',
+    state_region: 'DL',
+    address_line: 'ITH House, Institutional Area, New Delhi',
+    contact_email: 'corporate.bookings@ith.co.in',
+    recon_account_gl: '211000',
+    payment_terms: 'NT30',
+    is_active: true,
+  },
+  {
+    id: 'v_indigo',
+    vendor_code: '100092',
+    vendor_name: 'InterGlobe Aviation Ltd. (IndiGo)',
+    tax_identifier: '07AABCI4818R1Z1',
+    country_code: 'IND',
+    state_region: 'HR',
+    address_line: 'Global Business Park, MG Road, Gurugram',
+    contact_email: 'gst.invoices@goindigo.in',
+    recon_account_gl: '211000',
+    payment_terms: 'IMMED',
+    is_active: true,
+  },
+  {
+    id: 'v_airindia',
+    vendor_code: '100095',
+    vendor_name: 'Air India Ltd.',
+    tax_identifier: '07AABCA8898E1Z9',
+    country_code: 'IND',
+    state_region: 'DL',
+    address_line: 'Airlines House, 113 Gurudwara Rakabganj Rd, New Delhi',
+    contact_email: 'corporate.support@airindia.com',
+    recon_account_gl: '211000',
+    payment_terms: 'IMMED',
+    is_active: true,
+  },
+  {
+    id: 'v_annapurna',
+    vendor_code: '200101',
+    vendor_name: 'Hotel Annapurna & Hospitality Pvt. Ltd.',
+    tax_identifier: '301294857',
+    country_code: 'NPL',
+    state_region: 'BAGMATI',
+    address_line: 'Durbar Marg, Kathmandu, Nepal',
+    contact_email: 'accounts@annapurna.com.np',
+    recon_account_gl: '211000',
+    payment_terms: 'NT15',
+    is_active: true,
+  },
 ];
 
 const INITIAL_ERROR_CATALOG: ErrorCatalogItem[] = [
@@ -548,10 +878,10 @@ export function useInvoiceFlowStore() {
     return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
   });
 
-  // Master Data (Empty by default per Rule 1 - no mock data)
+  // Master Data
   const [vendors, setVendors] = useState<VendorEntity[]>(() => {
     const saved = localStorage.getItem('invoiceflow_vendors');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : SEED_VENDORS;
   });
 
   const [employees, setEmployees] = useState<EmployeeEntity[]>(() => {
@@ -597,6 +927,99 @@ export function useInvoiceFlowStore() {
   const [approvalMatrices, setApprovalMatrices] = useState<ApprovalMatrixEntity[]>(() => {
     const saved = localStorage.getItem('invoiceflow_approval_matrices');
     return saved ? JSON.parse(saved) : [];
+  });
+
+  // Prompt 03: Reference Solution Entities
+  const [streams, setStreams] = useState<ProcessingStreamEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_streams');
+    return saved ? JSON.parse(saved) : SEED_STREAMS;
+  });
+
+  const [subcategories, setSubcategories] = useState<ProcessingStreamSubcategory[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_subcategories');
+    return saved ? JSON.parse(saved) : SEED_SUBCATEGORIES;
+  });
+
+  const [taxRegimes, setTaxRegimes] = useState<TaxRegimeEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_tax_regimes');
+    return saved ? JSON.parse(saved) : SEED_TAX_REGIMES;
+  });
+
+  const [profitCenters, setProfitCenters] = useState<ProfitCenterEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_profit_centers');
+    return saved ? JSON.parse(saved) : SEED_PROFIT_CENTERS;
+  });
+
+  const [bsCalendar, setBsCalendar] = useState<BikramSambatCalendarRecord[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_bs_calendar');
+    return saved ? JSON.parse(saved) : SEED_BS_CALENDAR;
+  });
+
+  const [aiModelPricing, setAiModelPricing] = useState<AiModelPricingEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_ai_pricing');
+    return saved ? JSON.parse(saved) : SEED_AI_MODEL_PRICING;
+  });
+
+  const [masterImportProfiles, setMasterImportProfiles] = useState<MasterImportProfileEntity[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_master_import_profiles');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'mip_vendor',
+        profile_key: 'IMPORT_VENDOR_SAP_CSV',
+        master_type: 'VENDOR',
+        description: 'Vendor Master CSV export from SAP ECC (XK03/LFA1)',
+        receiving_mailbox: 'masters@snpl.com.np',
+        allowed_sender_domains: ['@snpl.com.np', '@enterprise.internal'],
+        subject_pattern: '.*VENDOR.*',
+        file_name_pattern: '.*VENDORS?.*\\.csv',
+        import_mode: 'UPSERT',
+        require_admin_approval: false,
+        max_deactivation_pct: 10.0,
+        is_active: true,
+      }
+    ];
+  });
+
+  const [masterImportBatches, setMasterImportBatches] = useState<MasterImportBatchRecord[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_master_import_batches');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [evaluationSets, setEvaluationSets] = useState<EvaluationSetRecord[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_eval_sets');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'es_cust_v1',
+        set_name: 'CUSTOMER_TRAVEL_SAMPLE_SET_V1',
+        description: 'Real Customer Travel, Hotel, Airline and Nepali bills',
+        total_samples: 45,
+        sample_categories: ['HOTEL', 'AIRLINE', 'CAB', 'NEPALI_VAT'],
+        is_locked: false,
+        created_at: new Date().toISOString(),
+      }
+    ];
+  });
+
+  const [evaluationRuns, setEvaluationRuns] = useState<EvaluationRunRecord[]>(() => {
+    const saved = localStorage.getItem('invoiceflow_eval_runs');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: 'er_001',
+        run_code: 'RUN-EVAL-20260930-01',
+        evaluation_set_id: 'es_cust_v1',
+        model_profile: 'gemini-3.1-flash-lite',
+        total_evaluated: 45,
+        overall_exact_match_pct: 95.8,
+        overall_tolerance_match_pct: 98.2,
+        stp_rate_pct: 96.0,
+        nepali_language_accuracy_pct: 97.5,
+        avg_latency_ms: 1140,
+        avg_cost_inr: 0.148,
+        avg_cost_npr: 0.237,
+        status: 'COMPLETED',
+        created_at: new Date().toISOString(),
+      }
+    ];
   });
 
   // Documents & Runs (Empty by default per Rule 1)
@@ -817,6 +1240,36 @@ export function useInvoiceFlowStore() {
 
     approvalMatrices,
     setApprovalMatrices,
+
+    streams,
+    setStreams,
+
+    subcategories,
+    setSubcategories,
+
+    taxRegimes,
+    setTaxRegimes,
+
+    profitCenters,
+    setProfitCenters,
+
+    bsCalendar,
+    setBsCalendar,
+
+    aiModelPricing,
+    setAiModelPricing,
+
+    masterImportProfiles,
+    setMasterImportProfiles,
+
+    masterImportBatches,
+    setMasterImportBatches,
+
+    evaluationSets,
+    setEvaluationSets,
+
+    evaluationRuns,
+    setEvaluationRuns,
 
     documents,
     setDocuments,

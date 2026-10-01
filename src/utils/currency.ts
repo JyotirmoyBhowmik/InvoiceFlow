@@ -45,7 +45,7 @@ export function formatOriginalCurrency(amount: number, currency?: string): strin
     AUD: 'A$',
     JPY: '¥',
     CHF: 'CHF ',
-    NPR: 'NPR ',
+    NPR: 'रू ',
   };
   const sym = symbolMap[curr] || `${curr} `;
   return `${sym}${(amount || 0).toLocaleString(undefined, {
@@ -74,7 +74,7 @@ export function getCurrencySymbol(currency?: string): string {
     CHF: 'CHF ',
     SAR: 'SAR ',
     QAR: 'QAR ',
-    NPR: 'NPR ',
+    NPR: 'रू',
   };
   return symbolMap[curr] || `${curr} `;
 }

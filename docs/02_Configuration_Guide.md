@@ -89,3 +89,56 @@ When conditions are met, the action set mutates document fields:
   }
 }
 ```
+
+---
+
+## 4. Processing Streams Configuration (Part A)
+
+InvoiceFlow organizes document flows into configurable processing streams stored in `processing_stream`. Adding a stream is purely a data operation:
+
+### 4.1 Core Stream Profiles
+1. **Stream A (`STREAM_A_ITH_TRAVEL`):** Travel-Agency / ITH corporate invoices for vendor payment.
+   - Subcategories: `HOTEL`, `AIRLINE`, `TRAIN`, `CAB`, `GENERAL`.
+   - Mandatory field matrices configured per subcategory.
+   - Trip ID handling: Validated against `trip_reference`. If absent, linked via fallback keys (employee + travel dates + route); logged as `WARN` without blocking the workflow.
+2. **Stream B (`STREAM_B_AIRLINE_TAX_CREDIT`):** Airline-issued tax invoices used strictly for VAT/GST input tax credit claims.
+   - Extracts PNR, e-ticket number, flight sector, passenger name, and customer tax ID.
+   - Cross-stream link (`VAL_STREAM_DOUBLE_CLAIM`): Automatically matches tickets previously billed under Stream A to prevent duplicate expense claims while enabling valid tax asset recovery.
+
+---
+
+## 5. Tax Regimes Master & Nepal VAT 13% Configuration (Part D.2, Part E)
+
+Tax calculation is regime-driven via `tax_regime`:
+
+| Regime Code | Country | Tax Type | Standard Rate | Identifier Format | Checksum Algorithm | Input Tax Claimable |
+|---|---|---|---|---|---|---|
+| `NEPAL_VAT` | NP | VAT | 13.00% | 9 Numeric Digits (`^\d{9}$`) | IRD Modulo 11 | Yes (Customer Nepal) |
+| `INDIA_GST` | IN | GST | 5% / 12% / 18% | 15 Characters Alphanumeric | GSTIN Checksum | Configurable per entity |
+
+---
+
+## 6. Bikram Sambat (B.S.) Calendar Table (Part E.3)
+
+Dates recorded in Bikram Sambat (e.g. `२०८३-०६-०८`) are converted to Gregorian A.D. and mapped to Nepal Fiscal Periods via the database table `bikram_sambat_calendar`:
+- **Nepal Fiscal Year:** Starts on 1st Shrawan (mid-July).
+- **Calendar Maintenance:** Finance administrators maintain upcoming calendar years via `master-import` CSV or the Admin Console. Hardcoded month lengths are strictly prohibited.
+
+---
+
+## 7. Master Import Profiles by Email (Part D.4)
+
+Masters (Vendors, GL Accounts, Cost Centers, Profit Centers, Tax Codes) can be updated by emailing SAP CSV view exports to `masters@snpl.com.np`:
+- **Safety Deactivation Threshold:** Configurable limit (default 10.0%). If a file would deactivate more than 10% of existing master records, the entire import is held for explicit SuperAdmin approval.
+- **Rollback:** Every update generates an encrypted snapshot enabling one-click audit rollback.
+
+---
+
+## 8. Multi-Cloud AI Provider Profiles & Token Pricing (Part H.4, Part I.1)
+
+Model profiles can be assigned per stream:
+- `gemini-3.1-flash-lite`: Fast, ultra-reliable multimodal extraction for standard travel PDFs.
+- `gemini-2.5-flash`: Legacy reference baseline model.
+- `azure-openai`: Azure OpenAI / Foundry in Customer's dedicated Azure subscription for strict in-tenant residency.
+- **Cost Profiling:** Pricing per 1M tokens is maintained in `ai_model_pricing` to benchmark real cost against the **15 paisa INR** reference metric.
+
